@@ -80,9 +80,10 @@ export function crearAlmacen(storage = globalThis.localStorage) {
 
   /**
    * Arma un registro nuevo a partir de lo cargado en el formulario y lo guarda.
-   * Los datos tienen que venir ya validados (lo hace app.js con validarFinanza).
+   * Los datos tienen que venir ya validados (lo hace app.js con validarFinanza o
+   * validarEjercicio, según la clase).
    *
-   * @param {{fecha: string, datos: import('./tipos.js').DatosFinanza}} entrada
+   * @param {{clase: string, fecha: string, datos: object}} entrada
    * @param {string} [momento] cuándo se anota; por defecto, ahora
    * @returns {import('./tipos.js').Registro} el registro guardado
    */
@@ -92,7 +93,7 @@ export function crearAlmacen(storage = globalThis.localStorage) {
     const registro = {
       id: crypto.randomUUID(),
       version: 1,
-      clase: 'finanza',
+      clase: entrada.clase,
       fecha: entrada.fecha,
       creado: momento,
       actualizado: momento,
@@ -108,14 +109,14 @@ export function crearAlmacen(storage = globalThis.localStorage) {
   }
 
   /**
-   * Cambia la fecha y los datos de un registro guardado.
-   * Los datos nuevos tienen que venir ya validados (lo hace app.js con validarFinanza).
+   * Cambia la fecha y los datos de un registro guardado. La clase no cambia.
+   * Los datos nuevos tienen que venir ya validados (lo hace app.js).
    *
    * Si el registro ya se había exportado, no se toca `exportado_como`: como la fila nueva ya no
    * coincide con la cargada en la bóveda, pendientes() lo muestra como corregido.
    *
    * @param {string} id
-   * @param {{fecha: string, datos: import('./tipos.js').DatosFinanza}} cambios
+   * @param {{fecha: string, datos: object}} cambios
    * @param {string} [momento] cuándo se edita; por defecto, ahora
    * @returns {import('./tipos.js').Registro} el registro editado
    */

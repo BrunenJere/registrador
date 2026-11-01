@@ -19,19 +19,41 @@
  */
 
 /**
+ * Un ejercicio de una sesión de fuerza.
+ *
+ * @typedef {object} Ejercicio
+ * @property {string} nombre
+ * @property {number | null} series
+ * @property {number | null} repeticiones
+ * @property {number | null} kg   null = peso corporal (calistenia)
+ */
+
+/**
+ * Los campos de una sesión de deporte (§13 de la especificación).
+ *
+ * @typedef {object} DatosEjercicio
+ * @property {string} actividad        "correr", "fuerza" u "otro"
+ * @property {number | null} minutos   entero (null si no se pudo leer)
+ * @property {number | null} km        al correr, y opcional en "otro"; null si no va
+ * @property {string} detalle          obligatorio en "otro"
+ * @property {Ejercicio[]} ejercicios  sólo en fuerza; puede estar vacía
+ * @property {string} nota
+ */
+
+/**
  * Un registro guardado. Lo que cambia según la clase está en `datos`.
  *
  * @typedef {object} Registro
  * @property {string} id
  * @property {number} version
- * @property {string} clase        "finanza" (en la fase 1, la única)
+ * @property {string} clase        "finanza" o "ejercicio"
  * @property {string} fecha        día al que corresponde, "aaaa-mm-dd"
  * @property {string} creado       momento local con zona, "aaaa-mm-ddThh:mm:ss-03:00"
  * @property {string} actualizado  ídem, última edición
  * @property {string} texto        la frase original (vacía en la fase 1)
- * @property {DatosFinanza} datos
+ * @property {any} datos  DatosFinanza si la clase es "finanza", DatosEjercicio si es "ejercicio"
  * @property {string | null} exportado       momento en que se copió para Claude
- * @property {string | null} exportado_como  la fila CSV tal como se exportó
+ * @property {string | null} exportado_como  la línea que hoy está cargada en la bóveda
  * @property {boolean} anulado
  */
 

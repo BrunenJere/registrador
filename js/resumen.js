@@ -17,16 +17,17 @@ export function registrosDelDia(registros, dia) {
 }
 
 /**
- * Ingresos y egresos por moneda, sin contar los anulados. No convierte dólares a pesos: eso lo
- * hace el resumen del historial con el tipo de cambio del mes.
+ * Ingresos y egresos por moneda. Cuenta sólo los registros de plata (no las sesiones de
+ * deporte) y no cuenta los anulados. No convierte dólares a pesos: eso lo hace el resumen del
+ * historial con el tipo de cambio del mes.
  *
  * @param {import('./tipos.js').Registro[]} registros
  * @returns {{ARS: {ingresos: number, egresos: number}, USD: {ingresos: number, egresos: number}}}
  */
 export function totales(registros) {
   const resultado = { ARS: { ingresos: 0, egresos: 0 }, USD: { ingresos: 0, egresos: 0 } };
-  for (const { anulado, datos } of registros) {
-    if (anulado) continue;
+  for (const { clase, anulado, datos } of registros) {
+    if (clase !== 'finanza' || anulado) continue;
     const moneda = datos.moneda === 'USD' ? resultado.USD : resultado.ARS;
     if (datos.tipo === 'ingreso') moneda.ingresos += datos.monto ?? 0;
     else moneda.egresos += datos.monto ?? 0;
@@ -40,8 +41,8 @@ export function totales(registros) {
 }
 
 /**
- * El medio del último registro anotado (sin contar anulados), para dejarlo elegido en el
- * formulario. Vacío si todavía no hay registros.
+ * El medio del último registro de plata anotado (sin contar anulados), para dejarlo elegido en
+ * el formulario. Vacío si todavía no hay registros de plata.
  *
  * @param {import('./tipos.js').Registro[]} registros
  * @returns {string}
@@ -49,7 +50,7 @@ export function totales(registros) {
 export function ultimoMedio(registros) {
   let ultimo = null;
   for (const registro of registros) {
-    if (registro.anulado) continue;
+    if (registro.clase !== 'finanza' || registro.anulado) continue;
     if (!ultimo || registro.creado > ultimo.creado) ultimo = registro;
   }
   return ultimo ? ultimo.datos.medio : '';

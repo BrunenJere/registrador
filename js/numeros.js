@@ -42,3 +42,19 @@ export function leerMonto(texto) {
 
   return monto;
 }
+
+/**
+ * Convierte un número entero escrito (minutos, series, repeticiones) a número.
+ * Los límites (por ejemplo, minutos entre 1 y 600) los revisa la validación, que da un mensaje
+ * más claro.
+ *
+ * @param {string} texto por ejemplo "32"
+ * @returns {number | null} el entero, o null si el texto no son sólo dígitos
+ */
+export function leerEntero(texto) {
+  const limpio = String(texto).trim();
+  if (!/^\d+$/.test(limpio)) {
+    return null;
+  }
+  return Number(limpio);
+}

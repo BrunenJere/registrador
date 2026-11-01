@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { leerMonto } from '../js/numeros.js';
+import { leerMonto, leerEntero } from '../js/numeros.js';
 
 test('lee montos con punto de miles y coma decimal', () => {
   assert.equal(leerMonto('3500'), 3500);
@@ -35,4 +35,14 @@ test('rechaza los casos dudosos en vez de adivinar', () => {
 test('rechaza el cero', () => {
   assert.equal(leerMonto('0'), null);
   assert.equal(leerMonto('0,00'), null);
+});
+
+test('leerEntero lee sólo dígitos', () => {
+  assert.equal(leerEntero('32'), 32);
+  assert.equal(leerEntero(' 45 '), 45);
+  assert.equal(leerEntero('0'), 0); // el 0 se lee; la validación dice que no alcanza
+  assert.equal(leerEntero(''), null);
+  assert.equal(leerEntero('3,5'), null);
+  assert.equal(leerEntero('-3'), null);
+  assert.equal(leerEntero('diez'), null);
 });

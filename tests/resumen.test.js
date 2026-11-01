@@ -7,6 +7,7 @@ import { estadoDeExportacion, aFilaCSV } from '../js/exportar.js';
 function registro({ id = 'a', fecha = '2026-11-01', creado = '2026-11-01T10:00:00-03:00', anulado = false, ...datos } = {}) {
   return {
     id,
+    clase: 'finanza',
     fecha,
     creado,
     anulado,
@@ -58,4 +59,19 @@ test('estadoDeExportacion: nuevo, exportado, corregido y anulado', () => {
   assert.equal(estadoDeExportacion(r), 'corregido');
   r.anulado = true;
   assert.equal(estadoDeExportacion(r), 'anulado');
+});
+
+test('totales y ultimoMedio ignoran las sesiones de deporte', () => {
+  const corrida = {
+    id: 'c',
+    clase: 'ejercicio',
+    fecha: '2026-11-01',
+    creado: '2026-11-01T21:00:00-03:00',
+    anulado: false,
+    exportado_como: null,
+    datos: { actividad: 'correr', minutos: 32, km: 3.2, detalle: '', ejercicios: [], nota: '' },
+  };
+  const lista = [registro({ monto: 3500, medio: 'efectivo' }), corrida];
+  assert.deepEqual(totales(lista), { ARS: { ingresos: 0, egresos: 3500 }, USD: { ingresos: 0, egresos: 0 } });
+  assert.equal(ultimoMedio(lista), 'efectivo'); // la corrida es más nueva, pero no tiene medio
 });

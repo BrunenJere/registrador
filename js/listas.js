@@ -37,3 +37,7 @@ export const MEDIOS = Object.freeze([
 ]);
 
 export const MONEDAS = Object.freeze(['ARS', 'USD']);
+
+// Actividades de una sesión de deporte. "otro" es todo lo que no es correr ni fuerza
+// (caminar, bici, la limpieza del fondo).
+export const ACTIVIDADES = Object.freeze(['correr', 'fuerza', 'otro']);

@@ -85,7 +85,7 @@ function alGuardar(/** @type {SubmitEvent} */ evento) {
       formularioNuevo();
       mostrarPestana('hoy');
     } else {
-      almacen.agregar(registro);
+      almacen.agregar({ clase: 'finanza', ...registro });
       mostrarAviso('Guardado.');
       formularioNuevo();
     }

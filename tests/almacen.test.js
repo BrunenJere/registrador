@@ -20,6 +20,7 @@ const MAS_TARDE = '2026-11-01T22:00:00-03:00';
 /** Lo que carga el formulario. */
 function entrada(cambios = {}) {
   return {
+    clase: 'finanza',
     fecha: '2026-11-01',
     datos: {
       tipo: 'egreso',
@@ -165,4 +166,14 @@ test('sin espacio avisa con un mensaje claro', () => {
 
 test('pedirPersistencia da false donde no se puede pedir', async () => {
   assert.equal(await pedirPersistencia(), false); // Node no tiene navigator.storage
+});
+
+test('agregar guarda la clase que recibe', () => {
+  const almacen = crearAlmacen(storageFalso());
+  const sesion = almacen.agregar(
+    { clase: 'ejercicio', fecha: '2026-11-01', datos: { actividad: 'correr', minutos: 32, km: 3.2, detalle: '', ejercicios: [], nota: '' } },
+    MOMENTO,
+  );
+  assert.equal(sesion.clase, 'ejercicio');
+  assert.equal(almacen.leerTodos()[0].datos.km, 3.2);
 });
