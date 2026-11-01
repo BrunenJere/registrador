@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarFinanza } from '../js/validar.js';
+import { validarFinanza, validarEjercicio } from '../js/validar.js';
 
 const HOY = '2026-11-01';
 
@@ -80,4 +80,71 @@ test('el proyecto es opcional, pero si está tiene forma de ID', () => {
 test('informa todos los errores juntos, no sólo el primero', () => {
   const vacio = { tipo: 'egreso', categoria: '', detalle: '', monto: null, moneda: 'ARS', medio: '', proyecto: '' };
   assert.deepEqual(camposConError({ fecha: HOY, datos: vacio }), ['categoria', 'detalle', 'monto', 'medio']);
+});
+
+// ---------- Deporte ----------
+
+/** Una corrida válida; cada prueba cambia un solo dato. */
+function sesion(cambios = {}, fecha = HOY) {
+  return {
+    fecha,
+    datos: { actividad: 'correr', minutos: 32, km: 3.2, detalle: '', ejercicios: [], nota: '', ...cambios },
+  };
+}
+
+function camposDeporte(registro) {
+  return validarEjercicio(registro, HOY).map((error) => error.campo);
+}
+
+const SENTADILLA = { nombre: 'sentadilla', series: 3, repeticiones: 12, kg: 12.5 };
+const FLEXIONES = { nombre: 'flexiones', series: 3, repeticiones: 10, kg: null };
+
+test('deporte: correr, fuerza y otro completos no tienen errores', () => {
+  assert.deepEqual(camposDeporte(sesion()), []);
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'fuerza', km: null, minutos: 40, ejercicios: [SENTADILLA, FLEXIONES] })), []);
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'fuerza', km: null, minutos: 40 })), []); // sin detalle también vale
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'otro', km: null, minutos: 90, detalle: 'limpieza del fondo' })), []);
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'otro', km: 2, minutos: 25, detalle: 'caminar' })), []);
+});
+
+test('deporte: la fecha tiene que existir y no ser futura', () => {
+  assert.deepEqual(camposDeporte(sesion({}, '2026-11-02')), ['fecha']);
+  assert.deepEqual(camposDeporte(sesion({}, '2026-02-30')), ['fecha']);
+});
+
+test('deporte: con una actividad inválida no se revisa el resto', () => {
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'natación', minutos: null })), ['actividad']);
+});
+
+test('deporte: minutos enteros entre 1 y 600', () => {
+  assert.deepEqual(camposDeporte(sesion({ minutos: null })), ['minutos']);
+  assert.deepEqual(camposDeporte(sesion({ minutos: 0 })), ['minutos']);
+  assert.deepEqual(camposDeporte(sesion({ minutos: 601 })), ['minutos']);
+  assert.deepEqual(camposDeporte(sesion({ minutos: 32.5 })), ['minutos']);
+});
+
+test('deporte: km obligatorios al correr, prohibidos en fuerza, con límites', () => {
+  assert.deepEqual(camposDeporte(sesion({ km: null })), ['km']);
+  assert.deepEqual(camposDeporte(sesion({ km: 101 })), ['km']);
+  assert.deepEqual(camposDeporte(sesion({ km: 3.255 })), ['km']);
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'fuerza', km: 3 })), ['km']);
+});
+
+test('deporte: "otro" necesita decir qué fue', () => {
+  assert.deepEqual(camposDeporte(sesion({ actividad: 'otro', km: null, detalle: '  ' })), ['detalle']);
+});
+
+test('deporte: cada ejercicio de fuerza tiene que estar completo', () => {
+  const fuerza = (ejercicios) => sesion({ actividad: 'fuerza', km: null, minutos: 40, ejercicios });
+  assert.deepEqual(camposDeporte(fuerza([SENTADILLA, { ...FLEXIONES, nombre: '' }])), ['ejercicio-1']);
+  assert.deepEqual(camposDeporte(fuerza([{ ...SENTADILLA, series: null }])), ['ejercicio-0']);
+  assert.deepEqual(camposDeporte(fuerza([{ ...SENTADILLA, repeticiones: 0 }])), ['ejercicio-0']);
+  assert.deepEqual(camposDeporte(fuerza([{ ...SENTADILLA, kg: 0 }])), ['ejercicio-0']);
+  const [error] = validarEjercicio(fuerza([SENTADILLA, { ...FLEXIONES, nombre: '' }]), HOY);
+  assert.equal(error.mensaje, 'Ejercicio 2: escribí el nombre.');
+});
+
+test('deporte: sólo la fuerza lleva ejercicios, y la nota es corta', () => {
+  assert.deepEqual(camposDeporte(sesion({ ejercicios: [SENTADILLA] })), ['actividad']);
+  assert.deepEqual(camposDeporte(sesion({ nota: 'x'.repeat(201) })), ['nota']);
 });
