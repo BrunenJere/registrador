@@ -1,0 +1,376 @@
+/* Colores y medidas en variables: se cambian en un solo lugar. */
+:root {
+  --fondo: #f6f5f1;
+  --superficie: #ffffff;
+  --texto: #1d2420;
+  --texto-suave: #5c665f;
+  --borde: #d9dcd6;
+  --principal: #1f5f4f;
+  --principal-texto: #ffffff;
+  --ingreso: #1f7a4d;
+  --egreso: #b3412e;
+  --error: #b3261e;
+  --radio: 12px;
+  --alto-pestanas: 64px;
+  color-scheme: light dark;
+}
+
+/* Modo oscuro: si el celular está en modo oscuro, se usan estos colores. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #121614;
+    --superficie: #1c211e;
+    --texto: #e8ebe8;
+    --texto-suave: #a3ada6;
+    --borde: #333b36;
+    --principal: #5fb39b;
+    --principal-texto: #0d1a15;
+    --ingreso: #6cc795;
+    --egreso: #f0907d;
+    --error: #ff8a80;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Que el atributo hidden oculte siempre, aunque otra regla le ponga display: flex. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px; /* 16px o más: así el celular no hace zoom al tocar un campo */
+  line-height: 1.4;
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 16px calc(var(--alto-pestanas) + 24px);
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 8px 0 16px;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin: 0 0 8px;
+}
+
+/* ---------- Campos ---------- */
+
+.campo {
+  margin-bottom: 16px;
+}
+
+label,
+.etiqueta {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+input[type='text'],
+input[type='date'] {
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  color: inherit;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+#monto {
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+input:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+.boton-secundario:focus-visible {
+  outline: 3px solid var(--principal);
+  outline-offset: 2px;
+}
+
+.error {
+  color: var(--error);
+  font-size: 0.9rem;
+  margin: 4px 0 0;
+}
+
+.error:empty {
+  display: none;
+}
+
+/* ---------- Botones de opciones (categoría, medio, tipo, moneda) ---------- */
+
+.opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opciones button {
+  padding: 10px 14px;
+  font: inherit;
+  color: inherit;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  min-height: 44px; /* tamaño mínimo cómodo para el dedo */
+}
+
+.opciones button[aria-checked='true'] {
+  background: var(--principal);
+  border-color: var(--principal);
+  color: var(--principal-texto);
+  font-weight: 600;
+}
+
+/* Egreso / Ingreso y ARS / USD: dos botones que ocupan todo el ancho. */
+.opciones-dos button {
+  flex: 1;
+  border-radius: var(--radio);
+}
+
+details {
+  margin-bottom: 16px;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+/* ---------- Botones de acción ---------- */
+
+.acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.boton-principal,
+.boton-secundario {
+  flex: 1;
+  min-height: 48px;
+  padding: 12px 16px;
+  font: inherit;
+  font-weight: 600;
+  border-radius: var(--radio);
+  text-align: center;
+  cursor: pointer;
+}
+
+.boton-principal {
+  background: var(--principal);
+  color: var(--principal-texto);
+  border: none;
+}
+
+.boton-secundario {
+  background: transparent;
+  color: var(--principal);
+  border: 1px solid var(--principal);
+}
+
+.boton-principal:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- Hoy ---------- */
+
+.totales {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.total {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 12px;
+}
+
+.total span {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.total strong {
+  font-size: 1.15rem;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.registro {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  margin-bottom: 8px;
+}
+
+.registro > button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.registro .detalle {
+  font-weight: 600;
+}
+
+.registro .meta {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.registro .monto {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.registro .monto.ingreso {
+  color: var(--ingreso);
+}
+
+.registro .monto.egreso {
+  color: var(--egreso);
+}
+
+.registro.anulado {
+  opacity: 0.55;
+}
+
+.registro.anulado .detalle,
+.registro.anulado .monto {
+  text-decoration: line-through;
+}
+
+.registro .acciones {
+  padding: 0 12px 12px;
+}
+
+.vacio {
+  color: var(--texto-suave);
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* ---------- Exportar ---------- */
+
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  background: var(--fondo);
+  padding: 12px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* ---------- Avisos ---------- */
+
+#avisos {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: var(--radio);
+  background: var(--texto);
+  color: var(--fondo);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
+
+.aviso.error-general {
+  background: var(--error);
+  color: #fff;
+}
+
+.aviso button {
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* ---------- Pestañas de abajo ---------- */
+
+.pestanas {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  height: calc(var(--alto-pestanas) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom); /* el espacio de la barra de gestos del celular */
+  background: var(--superficie);
+  border-top: 1px solid var(--borde);
+}
+
+.pestanas button {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  color: var(--texto-suave);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pestanas button[aria-current='page'] {
+  color: var(--principal);
+  box-shadow: inset 0 3px 0 var(--principal);
+}

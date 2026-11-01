@@ -55,6 +55,18 @@ export function filaEsperada(registro) {
 }
 
 /**
+ * En qué estado está un registro respecto de la bóveda, para mostrarlo en la lista.
+ *
+ * @param {import('./tipos.js').Registro} registro
+ * @returns {'nuevo' | 'exportado' | 'corregido' | 'anulado'}
+ */
+export function estadoDeExportacion(registro) {
+  if (registro.anulado) return 'anulado';
+  if (registro.exportado_como === null) return 'nuevo';
+  return registro.exportado_como === aFilaCSV(registro) ? 'exportado' : 'corregido';
+}
+
+/**
  * Separa lo que falta pasar a la bóveda, ordenado por fecha y, dentro del día, por cómo se
  * anotó.
  *

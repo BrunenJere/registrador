@@ -1,0 +1,16 @@
+{
+  "name": "Registrador",
+  "short_name": "Registrador",
+  "description": "Anotar ingresos y egresos desde el celular, sin internet.",
+  "lang": "es-AR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f5f4f",
+  "icons": [
+    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

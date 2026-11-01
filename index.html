@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1f5f4f" />
+    <title>Registrador</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="iconos/icono.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="iconos/icono-192.png" />
+    <link rel="stylesheet" href="css/estilos.css" />
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <!-- Avisos que aparecen arriba: versión nueva, recordatorio de respaldo, errores. -->
+    <div id="avisos" aria-live="polite"></div>
+
+    <main>
+      <!-- ============ Anotar ============ -->
+      <section id="pestana-anotar" class="pestana" data-pestana="anotar">
+        <h1 id="titulo-formulario">Anotar</h1>
+
+        <form id="formulario" novalidate autocomplete="off">
+          <div class="campo">
+            <div class="opciones opciones-dos" id="opciones-tipo" role="radiogroup" aria-label="Tipo">
+              <!-- Botones Egreso / Ingreso: los dibuja pantalla.js -->
+            </div>
+            <p class="error" data-error="tipo"></p>
+          </div>
+
+          <div class="campo">
+            <label for="monto">Monto</label>
+            <input id="monto" name="monto" type="text" inputmode="decimal" placeholder="3.500 o 3500,50" />
+            <p class="error" data-error="monto"></p>
+          </div>
+
+          <div class="campo">
+            <span class="etiqueta">Categoría</span>
+            <div class="opciones" id="opciones-categoria" role="radiogroup" aria-label="Categoría"></div>
+            <p class="error" data-error="categoria"></p>
+          </div>
+
+          <div class="campo">
+            <span class="etiqueta">Medio</span>
+            <div class="opciones" id="opciones-medio" role="radiogroup" aria-label="Medio"></div>
+            <p class="error" data-error="medio"></p>
+          </div>
+
+          <div class="campo">
+            <label for="detalle">Detalle</label>
+            <input id="detalle" name="detalle" type="text" placeholder="súper, nafta, sueldo…" maxlength="120" />
+            <p class="error" data-error="detalle"></p>
+          </div>
+
+          <details id="mas-opciones">
+            <summary>Más opciones</summary>
+            <div class="campo">
+              <label for="fecha">Fecha</label>
+              <input id="fecha" name="fecha" type="date" />
+              <p class="error" data-error="fecha"></p>
+            </div>
+            <div class="campo">
+              <span class="etiqueta">Moneda</span>
+              <div class="opciones opciones-dos" id="opciones-moneda" role="radiogroup" aria-label="Moneda"></div>
+              <p class="error" data-error="moneda"></p>
+            </div>
+            <div class="campo">
+              <label for="proyecto">Proyecto (opcional)</label>
+              <input id="proyecto" name="proyecto" type="text" placeholder="P05" maxlength="3" autocapitalize="characters" />
+              <p class="error" data-error="proyecto"></p>
+            </div>
+          </details>
+
+          <div class="acciones">
+            <button type="submit" class="boton-principal" id="boton-guardar">Guardar</button>
+            <button type="button" class="boton-secundario" id="boton-cancelar" hidden>Cancelar</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ Hoy ============ -->
+      <section id="pestana-hoy" class="pestana" data-pestana="hoy" hidden>
+        <h1>Registros</h1>
+        <div class="campo">
+          <label for="dia">Día</label>
+          <input id="dia" type="date" />
+        </div>
+        <div id="totales" class="totales"></div>
+        <ul id="lista" class="lista"></ul>
+      </section>
+
+      <!-- ============ Exportar ============ -->
+      <section id="pestana-exportar" class="pestana" data-pestana="exportar" hidden>
+        <h1>Exportar</h1>
+
+        <div class="tarjeta">
+          <h2>Para Claude</h2>
+          <p id="resumen-pendientes"></p>
+          <div class="acciones">
+            <button type="button" class="boton-principal" id="boton-copiar">Copiar para Claude</button>
+            <button type="button" class="boton-secundario" id="boton-deshacer" hidden>Deshacer</button>
+          </div>
+          <details>
+            <summary>Ver el texto</summary>
+            <pre id="texto-claude"></pre>
+          </details>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Respaldo</h2>
+          <p id="ultimo-respaldo"></p>
+          <div class="acciones">
+            <button type="button" class="boton-principal" id="boton-descargar">Descargar respaldo</button>
+            <label class="boton-secundario" for="archivo-respaldo">Importar respaldo</label>
+            <input id="archivo-respaldo" type="file" accept="application/json,.json" hidden />
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============ Pestañas, abajo para usarla con una mano ============ -->
+    <nav class="pestanas" aria-label="Secciones">
+      <button type="button" data-ir="anotar" aria-current="page">Anotar</button>
+      <button type="button" data-ir="hoy">Hoy</button>
+      <button type="button" data-ir="exportar">Exportar</button>
+    </nav>
+  </body>
+</html>
