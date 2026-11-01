@@ -10,6 +10,9 @@ import { filaEsperada } from './exportar.js';
 // brunenjere.github.io comparten el mismo localStorage.
 export const CLAVE = 'registrador:v1:registros';
 
+// Cuándo se descargó el último respaldo, para recordar hacerlo una vez por semana.
+export const CLAVE_ULTIMO_RESPALDO = 'registrador:v1:ultimo-respaldo';
+
 // Todas las operaciones siguen el mismo patrón: leer la lista entera, cambiarla y guardarla
 // entera. Con unos cientos de registros por mes es instantáneo, y es el patrón más simple de
 // entender: lo guardado siempre es una lista completa y coherente.
@@ -191,7 +194,35 @@ export function crearAlmacen(storage = globalThis.localStorage) {
     guardarTodos(registros);
   }
 
-  return { leerTodos, guardarTodos, agregar, editar, borrar, marcarExportados, deshacerExportacion };
+  /**
+   * Cuándo se descargó el último respaldo, o null si nunca.
+   *
+   * @returns {string | null}
+   */
+  function leerUltimoRespaldo() {
+    return storage.getItem(CLAVE_ULTIMO_RESPALDO);
+  }
+
+  /**
+   * Anota que se descargó un respaldo.
+   *
+   * @param {string} [momento] por defecto, ahora
+   */
+  function guardarUltimoRespaldo(momento = momentoLocal()) {
+    storage.setItem(CLAVE_ULTIMO_RESPALDO, momento);
+  }
+
+  return {
+    leerTodos,
+    guardarTodos,
+    agregar,
+    editar,
+    borrar,
+    marcarExportados,
+    deshacerExportacion,
+    leerUltimoRespaldo,
+    guardarUltimoRespaldo,
+  };
 }
 
 /**
