@@ -136,8 +136,9 @@ function alBorrar(/** @type {string} */ id) {
 
 /** Copiar para Claude: copia el texto y, si se pudo copiar, marca todo como exportado. */
 async function alCopiar() {
-  const pend = pendientes(leerRegistros());
-  const texto = textoParaClaude(pend, momentoLocal());
+  const registros = leerRegistros();
+  const pend = pendientes(registros);
+  const texto = textoParaClaude(pend, momentoLocal(), registros);
   try {
     await navigator.clipboard.writeText(texto);
   } catch {
@@ -218,7 +219,7 @@ function refrescar() {
   dibujarExportar({
     cuantos,
     // Si no hay nada pendiente, se muestra el último texto copiado (por si hay que volver a copiarlo).
-    texto: hayPendientes ? textoParaClaude(pend, momentoLocal()) : (estado.ultimoTexto ?? textoParaClaude(pend, momentoLocal())),
+    texto: hayPendientes ? textoParaClaude(pend, momentoLocal(), registros) : (estado.ultimoTexto ?? textoParaClaude(pend, momentoLocal(), registros)),
     puedeDeshacer: estado.copiaExportacion !== null,
     ultimoRespaldo: almacen.leerUltimoRespaldo(),
   });

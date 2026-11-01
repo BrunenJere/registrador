@@ -1,22 +1,27 @@
 // @ts-check
 
+import { resumenDeSesion, lunesDe, resumenDeSemana, filaSemanalS03 } from './deporte.js';
+
 // Arma lo que se le pasa a Claude en el cierre del día. Son funciones puras: reciben
 // registros y devuelven texto o listas; no tocan la pantalla ni el almacenamiento.
 //
-// La idea central es el campo `exportado_como`: guarda la fila que HOY está cargada en la
-// bóveda para ese registro (null si no hay ninguna). Comparándola con la fila que debería
+// La idea central es el campo `exportado_como`: guarda la línea que HOY está cargada en la
+// bóveda para ese registro (null si no hay ninguna). Comparándola con la línea que debería
 // estar, se sabe qué falta pasar:
 //
 //   debería estar   está en la bóveda   →  qué es
-//   una fila        nada (null)         →  nuevo
-//   una fila        otra fila           →  corregido
-//   nada (anulado)  una fila            →  anulado
+//   una línea       nada (null)         →  nuevo
+//   una línea       otra línea          →  corregido
+//   nada (anulado)  una línea           →  anulado
 //   lo mismo        lo mismo            →  nada pendiente
+//
+// La línea depende de la clase: una fila CSV del historial para la plata, y una línea de texto
+// para cada sesión de deporte. Todo lo demás (pendientes, estados) es igual para las dos.
 
 const ENCABEZADO_CSV = 'fecha,tipo,categoria,detalle,monto,moneda,medio,proyecto';
 
 /**
- * La fila del historial de un registro, en el orden de las columnas.
+ * La fila del historial de un registro de plata, en el orden de las columnas.
  *
  * @param {import('./tipos.js').Registro} registro
  * @returns {string} por ejemplo "2026-11-01,egreso,comida,súper,3500,ARS,débito,"
@@ -45,13 +50,28 @@ function campoCSV(valor) {
 }
 
 /**
- * La fila que debería estar en la bóveda: ninguna si el registro está anulado.
+ * La línea de un registro según su clase:
+ * - plata: la fila CSV del historial;
+ * - deporte: "2026-11-02 · correr · 3,2 km · 32 min · 10:00 min/km".
+ *
+ * @param {import('./tipos.js').Registro} registro
+ * @returns {string}
+ */
+export function lineaDeRegistro(registro) {
+  if (registro.clase === 'ejercicio') {
+    return `${registro.fecha} · ${resumenDeSesion(registro.datos)}`;
+  }
+  return aFilaCSV(registro);
+}
+
+/**
+ * La línea que debería estar en la bóveda: ninguna si el registro está anulado.
  *
  * @param {import('./tipos.js').Registro} registro
  * @returns {string | null}
  */
 export function filaEsperada(registro) {
-  return registro.anulado ? null : aFilaCSV(registro);
+  return registro.anulado ? null : lineaDeRegistro(registro);
 }
 
 /**
@@ -63,7 +83,7 @@ export function filaEsperada(registro) {
 export function estadoDeExportacion(registro) {
   if (registro.anulado) return 'anulado';
   if (registro.exportado_como === null) return 'nuevo';
-  return registro.exportado_como === aFilaCSV(registro) ? 'exportado' : 'corregido';
+  return registro.exportado_como === lineaDeRegistro(registro) ? 'exportado' : 'corregido';
 }
 
 /**
@@ -95,34 +115,67 @@ export function pendientes(registros) {
 }
 
 /**
- * El texto que se copia para Claude.
+ * El texto que se copia para Claude: primero la plata, después el deporte y, si hubo cambios
+ * de deporte, la fila de Métricas de S03 de cada semana tocada (calculada con TODOS los
+ * registros de esa semana, no sólo con los pendientes).
  *
  * @param {ReturnType<typeof pendientes>} pend lo que devuelve pendientes()
  * @param {string} momento cuándo se exporta, como lo da momentoLocal()
+ * @param {import('./tipos.js').Registro[]} [registros] todos los registros, para la fila semanal
  * @returns {string}
  */
-export function textoParaClaude(pend, momento) {
+export function textoParaClaude(pend, momento, registros = []) {
   const { nuevos, corregidos, anulados } = pend;
   const lineas = [
     `REGISTRADOR · exportado el ${fechaHoraLegible(momento)}`,
     `Nuevos: ${nuevos.length} · Corregidos: ${corregidos.length} · Anulados: ${anulados.length}`,
   ];
 
-  if (nuevos.length > 0) {
-    lineas.push('', '## Filas nuevas para el historial', ENCABEZADO_CSV);
-    for (const registro of nuevos) lineas.push(aFilaCSV(registro));
-  }
+  /** @param {import('./tipos.js').Registro[]} lista */
+  const deClase = (lista, clase) => lista.filter((r) => (r.clase ?? 'finanza') === clase);
 
-  if (corregidos.length > 0) {
+  // ---- Plata ----
+  const plata = { nuevos: deClase(nuevos, 'finanza'), corregidos: deClase(corregidos, 'finanza'), anulados: deClase(anulados, 'finanza') };
+
+  if (plata.nuevos.length > 0) {
+    lineas.push('', '## Filas nuevas para el historial', ENCABEZADO_CSV);
+    for (const registro of plata.nuevos) lineas.push(aFilaCSV(registro));
+  }
+  if (plata.corregidos.length > 0) {
     lineas.push('', '## Correcciones de filas ya cargadas');
-    for (const registro of corregidos) {
+    for (const registro of plata.corregidos) {
       lineas.push(`antes: ${registro.exportado_como}`, `ahora: ${aFilaCSV(registro)}`);
     }
   }
-
-  if (anulados.length > 0) {
+  if (plata.anulados.length > 0) {
     lineas.push('', '## Filas anuladas (sacarlas del historial)');
-    for (const registro of anulados) lineas.push(`${registro.exportado_como}`);
+    for (const registro of plata.anulados) lineas.push(`${registro.exportado_como}`);
+  }
+
+  // ---- Deporte ----
+  const deporte = { nuevos: deClase(nuevos, 'ejercicio'), corregidos: deClase(corregidos, 'ejercicio'), anulados: deClase(anulados, 'ejercicio') };
+
+  if (deporte.nuevos.length > 0) {
+    lineas.push('', '## Deporte: sesiones nuevas');
+    for (const registro of deporte.nuevos) lineas.push(lineaDeRegistro(registro));
+  }
+  if (deporte.corregidos.length > 0) {
+    lineas.push('', '## Deporte: sesiones corregidas');
+    for (const registro of deporte.corregidos) {
+      lineas.push(`antes: ${registro.exportado_como}`, `ahora: ${lineaDeRegistro(registro)}`);
+    }
+  }
+  if (deporte.anulados.length > 0) {
+    lineas.push('', '## Deporte: sesiones anuladas');
+    for (const registro of deporte.anulados) lineas.push(`${registro.exportado_como}`);
+  }
+
+  // La fila de cada semana donde hubo algún cambio de deporte, en orden.
+  const tocadas = [...deporte.nuevos, ...deporte.corregidos, ...deporte.anulados];
+  if (tocadas.length > 0) {
+    const lunes = [...new Set(tocadas.map((r) => lunesDe(r.fecha)))].sort();
+    lineas.push('', '## Métricas de S03 (reemplazar la fila de estas semanas)');
+    for (const l of lunes) lineas.push(filaSemanalS03(resumenDeSemana(registros, l), l));
   }
 
   if (nuevos.length + corregidos.length + anulados.length === 0) {
