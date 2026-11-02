@@ -190,6 +190,64 @@ summary {
   opacity: 0.5;
 }
 
+/* ---------- Deporte ---------- */
+
+.selector-clase {
+  margin-bottom: 20px;
+}
+
+.ayuda {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  margin: 6px 0 0;
+}
+
+.ayuda:empty {
+  display: none;
+}
+
+/* Un ejercicio: el nombre arriba y, abajo, series, repeticiones y kg en una fila. */
+.fila-ejercicio {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--superficie);
+}
+
+.fila-ejercicio .numeros {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: end;
+}
+
+.fila-ejercicio label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.fila-ejercicio input[type='text'] {
+  padding: 10px;
+}
+
+.fila-ejercicio .quitar {
+  min-height: 44px;
+  padding: 0 12px;
+  font: inherit;
+  color: var(--error);
+  background: none;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  cursor: pointer;
+}
+
+#pestana-hoy h2 {
+  margin-top: 24px;
+}
+
 /* ---------- Hoy ---------- */
 
 .totales {

@@ -20,6 +20,9 @@
       <section id="pestana-anotar" class="pestana" data-pestana="anotar">
         <h1 id="titulo-formulario">Anotar</h1>
 
+        <!-- Plata | Deporte: elige cuál de los dos formularios se ve. Lo dibuja pantalla.js -->
+        <div class="opciones opciones-dos selector-clase" id="opciones-clase" role="radiogroup" aria-label="Qué anotar"></div>
+
         <form id="formulario" novalidate autocomplete="off">
           <div class="campo">
             <div class="opciones opciones-dos" id="opciones-tipo" role="radiogroup" aria-label="Tipo">
@@ -76,6 +79,63 @@
             <button type="button" class="boton-secundario" id="boton-cancelar" hidden>Cancelar</button>
           </div>
         </form>
+
+        <!-- ============ Formulario de deporte ============ -->
+        <form id="formulario-deporte" novalidate autocomplete="off" hidden>
+          <div class="campo">
+            <div class="opciones" id="opciones-actividad" role="radiogroup" aria-label="Actividad"></div>
+            <p class="error" data-error="actividad"></p>
+          </div>
+
+          <div class="campo" id="campo-km">
+            <label for="km">Km</label>
+            <input id="km" type="text" inputmode="decimal" placeholder="3,2" />
+            <p class="error" data-error="km"></p>
+          </div>
+
+          <div class="campo">
+            <label for="minutos">Minutos</label>
+            <input id="minutos" type="text" inputmode="numeric" placeholder="32" />
+            <p class="error" data-error="minutos"></p>
+            <p class="ayuda" id="ritmo"></p>
+          </div>
+
+          <div class="campo" id="campo-ejercicios">
+            <span class="etiqueta">Ejercicios (opcional)</span>
+            <div id="ejercicios"></div>
+            <!-- Sugerencias: los nombres usados antes -->
+            <datalist id="nombres-ejercicios"></datalist>
+            <div class="acciones">
+              <button type="button" class="boton-secundario" id="boton-agregar-ejercicio">Agregar ejercicio</button>
+              <button type="button" class="boton-secundario" id="boton-repetir">Repetir la última sesión</button>
+            </div>
+          </div>
+
+          <div class="campo">
+            <label for="detalle-deporte" id="etiqueta-detalle-deporte">Detalle (opcional)</label>
+            <input id="detalle-deporte" type="text" placeholder="con Thiago, en la plaza…" maxlength="120" />
+            <p class="error" data-error="detalle"></p>
+          </div>
+
+          <details id="mas-opciones-deporte">
+            <summary>Más opciones</summary>
+            <div class="campo">
+              <label for="fecha-deporte">Fecha</label>
+              <input id="fecha-deporte" type="date" />
+              <p class="error" data-error="fecha"></p>
+            </div>
+            <div class="campo">
+              <label for="nota">Nota (opcional)</label>
+              <input id="nota" type="text" placeholder="cómo me sentí, si dolió algo" maxlength="200" />
+              <p class="error" data-error="nota"></p>
+            </div>
+          </details>
+
+          <div class="acciones">
+            <button type="submit" class="boton-principal" id="boton-guardar-deporte">Guardar</button>
+            <button type="button" class="boton-secundario" id="boton-cancelar-deporte" hidden>Cancelar</button>
+          </div>
+        </form>
       </section>
 
       <!-- ============ Hoy ============ -->
@@ -85,8 +145,13 @@
           <label for="dia">Día</label>
           <input id="dia" type="date" />
         </div>
+        <h2>Plata</h2>
         <div id="totales" class="totales"></div>
         <ul id="lista" class="lista"></ul>
+
+        <h2 id="titulo-semana-deporte">Deporte</h2>
+        <div id="semana-deporte" class="totales"></div>
+        <ul id="lista-deporte" class="lista"></ul>
       </section>
 
       <!-- ============ Exportar ============ -->

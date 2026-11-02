@@ -1,17 +1,33 @@
 // @ts-check
 
 import { crearAlmacen, pedirPersistencia } from './almacen.js';
+import {
+  formatearRitmo,
+  lunesDe,
+  nombresDeEjercicios,
+  resumenDeSemana,
+  resumenDeSesion,
+  segundosPorKm,
+  ultimaSesionDeFuerza,
+} from './deporte.js';
 import { estadoDeExportacion, pendientes, textoParaClaude } from './exportar.js';
 import { hoyLocal, momentoLocal } from './fechas.js';
-import { leerMonto } from './numeros.js';
+import { leerEntero, leerMonto } from './numeros.js';
 import { descargarRespaldo, importarRespaldo, tocaRespaldo } from './respaldo.js';
 import { registrosDelDia, totales, ultimoMedio } from './resumen.js';
-import { validarFinanza } from './validar.js';
+import { validarEjercicio, validarFinanza } from './validar.js';
 import {
+  agregarEjercicio,
+  cargarEjercicios,
+  conectarFormularioDeporte,
+  dibujarDeporteHoy,
   dibujarExportar,
   dibujarFormulario,
+  dibujarFormularioDeporte,
   dibujarHoy,
+  dibujarSelectorClase,
   leerFormulario,
+  leerFormularioDeporte,
   mostrarAviso,
   mostrarErrores,
   mostrarPestana,
@@ -24,8 +40,12 @@ const almacen = crearAlmacen();
 
 /** Estado que vive sólo mientras la app está abierta. */
 const estado = {
+  /** @type {'plata' | 'deporte'} qué formulario se ve en Anotar */
+  clase: 'plata',
   /** @type {string | null} el id del registro que se está editando, o null si es uno nuevo */
   editandoId: null,
+  /** @type {string} la última actividad anotada, para dejarla elegida en el formulario */
+  ultimaActividad: 'correr',
   /** @type {import('./almacen.js').CopiaDeExportacion[] | null} para Deshacer la última exportación */
   copiaExportacion: null,
   /** @type {string | null} el último texto copiado, para poder volver a verlo */
@@ -48,9 +68,26 @@ function avisarError(/** @type {unknown} */ error) {
   mostrarAviso(mensaje, { error: true, persistente: true, accion: { texto: 'Cerrar', alTocar: () => {} } });
 }
 
-// ---------- Formulario ----------
+/** 3.5 → "3,5", como se escribe en el formulario (y como lo vuelve a leer leerMonto). */
+function aTexto(/** @type {number | null} */ numero) {
+  return numero === null ? '' : String(numero).replace('.', ',');
+}
 
-/** Deja el formulario listo para anotar uno nuevo. */
+// ---------- Plata | Deporte ----------
+
+/** Cambia el formulario que se ve. Si se estaba editando algo, se cancela la edición. */
+function alCambiarClase(/** @type {'plata' | 'deporte'} */ clase) {
+  estado.clase = clase;
+  if (estado.editandoId) {
+    formularioNuevo();
+    formularioDeporteNuevo();
+  }
+  dibujarSelectorClase(clase, alCambiarClase);
+}
+
+// ---------- Formulario de plata ----------
+
+/** Deja el formulario de plata listo para anotar uno nuevo. */
 function formularioNuevo() {
   estado.editandoId = null;
   dibujarFormulario({
@@ -66,7 +103,7 @@ function formularioNuevo() {
   });
 }
 
-/** Guardar: convertir el monto, validar y, si no hay errores, agregar o editar. */
+/** Guardar plata: convertir el monto, validar y, si no hay errores, agregar o editar. */
 function alGuardar(/** @type {SubmitEvent} */ evento) {
   evento.preventDefault(); // que el formulario no recargue la página
   const { fecha, montoTexto, datos } = leerFormulario();
@@ -74,55 +111,193 @@ function alGuardar(/** @type {SubmitEvent} */ evento) {
 
   const errores = validarFinanza(registro);
   if (errores.length > 0) {
-    mostrarErrores(errores);
+    mostrarErrores(errores, 'formulario');
     return;
   }
+  if (guardar('finanza', registro)) formularioNuevo();
+}
 
+// ---------- Formulario de deporte ----------
+
+/** Deja el formulario de deporte listo para anotar una sesión nueva. */
+function formularioDeporteNuevo() {
+  estado.editandoId = null;
+  dibujarFormularioDeporte(
+    {
+      actividad: estado.ultimaActividad,
+      km: '',
+      minutos: '',
+      detalle: '',
+      ejercicios: [],
+      nota: '',
+      fecha: hoyLocal(),
+      nombres: nombresDeEjercicios(leerRegistros()),
+      editando: false,
+    },
+    textoDeRitmo,
+  );
+}
+
+/** El ritmo mientras se escribe: "Ritmo: 10:00 min/km", o '' si todavía no se puede calcular. */
+function textoDeRitmo(/** @type {string} */ kmTexto, /** @type {string} */ minutosTexto) {
+  const km = leerMonto(kmTexto);
+  const minutos = leerEntero(minutosTexto);
+  if (km === null || !minutos) return '';
+  const segundos = segundosPorKm(minutos, km);
+  return segundos === null ? '' : `Ritmo: ${formatearRitmo(segundos)}`;
+}
+
+/**
+ * Un número opcional escrito en el formulario (km, kg): vacío es null. Si se escribió algo que
+ * no se puede leer, da NaN, para que la validación lo marque en vez de tomarlo como vacío.
+ */
+function numeroOpcional(/** @type {string} */ texto) {
+  return texto.trim() === '' ? null : (leerMonto(texto) ?? NaN);
+}
+
+/** Guardar deporte: convertir los números, validar y, si no hay errores, agregar o editar. */
+function alGuardarDeporte(/** @type {SubmitEvent} */ evento) {
+  evento.preventDefault();
+  const f = leerFormularioDeporte();
+  const esFuerza = f.actividad === 'fuerza';
+  const registro = {
+    fecha: f.fecha,
+    datos: {
+      actividad: f.actividad,
+      minutos: leerEntero(f.minutosTexto),
+      km: esFuerza ? null : numeroOpcional(f.kmTexto),
+      detalle: f.detalle,
+      ejercicios: esFuerza
+        ? f.ejercicios.map((e) => ({
+            nombre: e.nombre,
+            series: leerEntero(e.series),
+            repeticiones: leerEntero(e.repeticiones),
+            kg: numeroOpcional(e.kg),
+          }))
+        : [],
+      nota: f.nota,
+    },
+  };
+
+  const errores = validarEjercicio(registro);
+  if (errores.length > 0) {
+    mostrarErrores(errores, 'formulario-deporte');
+    return;
+  }
+  estado.ultimaActividad = f.actividad;
+  if (guardar('ejercicio', registro)) formularioDeporteNuevo();
+}
+
+/** Repetir la última sesión: copia los ejercicios de la última fuerza al formulario. */
+function alRepetir() {
+  const ejercicios = ultimaSesionDeFuerza(leerRegistros());
+  if (ejercicios.length === 0) {
+    mostrarAviso('Todavía no hay una sesión de fuerza con ejercicios para repetir.');
+    return;
+  }
+  cargarEjercicios(
+    ejercicios.map((e) => ({
+      nombre: e.nombre,
+      series: String(e.series ?? ''),
+      repeticiones: String(e.repeticiones ?? ''),
+      kg: aTexto(e.kg),
+    })),
+  );
+}
+
+// ---------- Guardar, editar y borrar (las dos clases) ----------
+
+/**
+ * Agrega o edita un registro ya validado y vuelve a dibujar.
+ *
+ * @param {'finanza' | 'ejercicio'} clase
+ * @param {{fecha: string, datos: object}} registro
+ * @returns {boolean} true si se guardó (si no, el formulario queda como está para no perder lo escrito)
+ */
+function guardar(clase, registro) {
+  let guardado = false;
   try {
     if (estado.editandoId) {
       almacen.editar(estado.editandoId, registro);
       mostrarAviso('Cambios guardados.');
-      formularioNuevo();
       mostrarPestana('hoy');
     } else {
-      almacen.agregar({ clase: 'finanza', ...registro });
+      almacen.agregar({ clase, ...registro });
       mostrarAviso('Guardado.');
-      formularioNuevo();
     }
+    guardado = true;
   } catch (error) {
     avisarError(error);
   }
   refrescar();
+  return guardado;
 }
 
-/** Editar: carga el registro en el formulario y va a Anotar. */
+/** Editar: carga el registro en su formulario y va a Anotar. */
 function alEditar(/** @type {string} */ id) {
   const registro = leerRegistros().find((r) => r.id === id);
   if (!registro) return;
-  estado.editandoId = id;
   const { datos } = registro;
-  dibujarFormulario({
-    tipo: datos.tipo,
-    categoria: datos.categoria,
-    medio: datos.medio,
-    moneda: datos.moneda,
-    monto: String(datos.monto).replace('.', ','), // 3500.5 → "3500,5", como lo lee leerMonto
-    detalle: datos.detalle,
-    fecha: registro.fecha,
-    proyecto: datos.proyecto,
-    editando: true,
-  });
+
+  if (registro.clase === 'ejercicio') {
+    estado.clase = 'deporte';
+    dibujarSelectorClase('deporte', alCambiarClase);
+    dibujarFormularioDeporte(
+      {
+        actividad: datos.actividad,
+        km: aTexto(datos.km),
+        minutos: String(datos.minutos ?? ''),
+        detalle: datos.detalle,
+        ejercicios: datos.ejercicios.map((/** @type {import('./tipos.js').Ejercicio} */ e) => ({
+          nombre: e.nombre,
+          series: String(e.series ?? ''),
+          repeticiones: String(e.repeticiones ?? ''),
+          kg: aTexto(e.kg),
+        })),
+        nota: datos.nota,
+        fecha: registro.fecha,
+        nombres: nombresDeEjercicios(leerRegistros()),
+        editando: true,
+      },
+      textoDeRitmo,
+    );
+  } else {
+    estado.clase = 'plata';
+    dibujarSelectorClase('plata', alCambiarClase);
+    dibujarFormulario({
+      tipo: datos.tipo,
+      categoria: datos.categoria,
+      medio: datos.medio,
+      moneda: datos.moneda,
+      monto: aTexto(datos.monto), // 3500.5 → "3500,5", como lo lee leerMonto
+      detalle: datos.detalle,
+      fecha: registro.fecha,
+      proyecto: datos.proyecto,
+      editando: true,
+    });
+  }
+  // Se marca después de dibujar, porque dibujar un formulario nuevo deja editandoId en null.
+  estado.editandoId = id;
   mostrarPestana('anotar');
+}
+
+/** Cancelar una edición: vuelve a Hoy con los formularios vacíos. */
+function alCancelar() {
+  formularioNuevo();
+  formularioDeporteNuevo();
+  mostrarPestana('hoy');
 }
 
 /** Borrar: pide confirmación; si ya se exportó, explica que queda anulado. */
 function alBorrar(/** @type {string} */ id) {
   const registro = leerRegistros().find((r) => r.id === id);
   if (!registro) return;
+  const nombre =
+    registro.clase === 'ejercicio' ? resumenDeSesion(registro.datos, { corto: true }) : registro.datos.detalle;
   const pregunta =
     registro.exportado === null
-      ? `¿Borrar «${registro.datos.detalle}»?`
-      : `«${registro.datos.detalle}» ya se lo pasaste a Claude. Va a quedar anulado y se avisa en la próxima exportación. ¿Seguir?`;
+      ? `¿Borrar «${nombre}»?`
+      : `«${nombre}» ya se lo pasaste a Claude. Va a quedar anulado y se avisa en la próxima exportación. ¿Seguir?`;
   if (!confirm(pregunta)) return;
   try {
     almacen.borrar(id);
@@ -204,10 +379,22 @@ function refrescar() {
   const registros = leerRegistros();
   const dia = /** @type {HTMLInputElement} */ (document.getElementById('dia')).value || hoyLocal();
   const delDia = registrosDelDia(registros, dia);
+  const plataDelDia = delDia.filter((r) => r.clase === 'finanza');
 
   dibujarHoy({
-    registros: delDia,
-    totales: totales(delDia),
+    registros: plataDelDia,
+    totales: totales(plataDelDia),
+    estadoDe: estadoDeExportacion,
+    alEditar,
+    alBorrar,
+  });
+
+  const lunes = lunesDe(dia);
+  dibujarDeporteHoy({
+    lunes,
+    semana: resumenDeSemana(registros, lunes),
+    sesiones: delDia.filter((r) => r.clase === 'ejercicio'),
+    resumirSesion: (datos) => resumenDeSesion(datos, { corto: true }),
     estadoDe: estadoDeExportacion,
     alEditar,
     alBorrar,
@@ -263,14 +450,18 @@ function registrarServiceWorker() {
 
 function iniciar() {
   /** @type {HTMLInputElement} */ (document.getElementById('dia')).value = hoyLocal();
+  dibujarSelectorClase(estado.clase, alCambiarClase);
+  conectarFormularioDeporte();
   formularioNuevo();
+  formularioDeporteNuevo();
   refrescar();
 
   document.getElementById('formulario')?.addEventListener('submit', alGuardar);
-  document.getElementById('boton-cancelar')?.addEventListener('click', () => {
-    formularioNuevo();
-    mostrarPestana('hoy');
-  });
+  document.getElementById('formulario-deporte')?.addEventListener('submit', alGuardarDeporte);
+  document.getElementById('boton-cancelar')?.addEventListener('click', alCancelar);
+  document.getElementById('boton-cancelar-deporte')?.addEventListener('click', alCancelar);
+  document.getElementById('boton-agregar-ejercicio')?.addEventListener('click', agregarEjercicio);
+  document.getElementById('boton-repetir')?.addEventListener('click', alRepetir);
   document.getElementById('dia')?.addEventListener('change', refrescar);
   document.getElementById('boton-copiar')?.addEventListener('click', alCopiar);
   document.getElementById('boton-deshacer')?.addEventListener('click', alDeshacer);

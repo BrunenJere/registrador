@@ -41,3 +41,7 @@ export const MONEDAS = Object.freeze(['ARS', 'USD']);
 // Actividades de una sesión de deporte. "otro" es todo lo que no es correr ni fuerza
 // (caminar, bici, la limpieza del fondo).
 export const ACTIVIDADES = Object.freeze(['correr', 'fuerza', 'otro']);
+
+// Sesiones por semana que pide el proyecto de entrenamiento (S03): se muestran como "2 de 4".
+// Si cambia la rutina, se cambia acá.
+export const METAS_SEMANA = Object.freeze({ corridas: 4, fuerza: 2 });
