@@ -185,3 +185,46 @@ function problemaDeEjercicio(e) {
   }
   return null;
 }
+
+/**
+ * Suma el error de fecha, si lo hay: que exista y que no sea futura.
+ *
+ * @param {string} fecha
+ * @param {string} hoy
+ * @param {import('./tipos.js').ErrorDeValidacion[]} errores
+ */
+function revisarFecha(fecha, hoy, errores) {
+  if (!esFechaValida(fecha)) {
+    errores.push({ campo: 'fecha', mensaje: 'La fecha no es válida.' });
+  } else if (fecha > hoy) {
+    errores.push({ campo: 'fecha', mensaje: 'La fecha no puede ser futura.' });
+  }
+}
+
+/**
+ * Revisa un registro de tiempo (§15, paso 2): minutos y en qué fueron.
+ *
+ * @param {Pick<import('./tipos.js').Registro, 'fecha' | 'datos'>} registro
+ * @param {string} [hoy]
+ * @returns {import('./tipos.js').ErrorDeValidacion[]} vacía si se puede guardar
+ */
+export function validarTiempo(registro, hoy = hoyLocal()) {
+  /** @type {import('./tipos.js').ErrorDeValidacion[]} */
+  const errores = [];
+  const { fecha, datos } = registro;
+  revisarFecha(fecha, hoy, errores);
+
+  if (!Number.isInteger(datos.minutos)) {
+    errores.push({ campo: 'minutos', mensaje: 'Escribí los minutos, en número entero.' });
+  } else if (datos.minutos < 1 || datos.minutos > 960) {
+    errores.push({ campo: 'minutos', mensaje: 'Los minutos tienen que ser entre 1 y 960 (16 horas).' });
+  }
+
+  if (typeof datos.que !== 'string' || datos.que.trim() === '') {
+    errores.push({ campo: 'que', mensaje: 'Escribí en qué fue (por ejemplo, GCI o pañalera).' });
+  } else if (datos.que.length > 120) {
+    errores.push({ campo: 'que', mensaje: 'Puede tener 120 caracteres como mucho.' });
+  }
+
+  return errores;
+}

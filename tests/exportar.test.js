@@ -141,3 +141,24 @@ test('textoDeDetalle: sin registros lo dice', () => {
     'REGISTRADOR · día 12/11/2026 · copiado el 15/11/2026 21:30\n\nNo hay registros en este período.',
   );
 });
+
+test('textoDeDetalle: el tiempo, con las horas por tema si es una semana entera', () => {
+  const tiempo = (id, fecha, minutos, que) => ({ id, clase: 'tiempo', fecha, creado: `${fecha}T10:00:00-03:00`, anulado: false, datos: { minutos, que } });
+  const lista = [tiempo('t1', '2026-11-09', 90, 'GCI'), tiempo('t2', '2026-11-10', 240, 'pañalera'), tiempo('t3', '2026-11-10', 30, 'gci')];
+  assert.equal(
+    textoDeDetalle(lista, '2026-11-09', '2026-11-15', MOMENTO),
+    [
+      'REGISTRADOR · semana del 09/11/2026 al 15/11/2026 · copiado el 15/11/2026 21:30',
+      '',
+      '## Tiempo',
+      '2026-11-09 · 90 min · GCI',
+      '2026-11-10 · 240 min · pañalera',
+      '2026-11-10 · 30 min · gci',
+      '',
+      '## Horas por tema en la semana',
+      '- pañalera: 4 h',
+      '- GCI: 2 h',
+    ].join('\n'),
+  );
+  assert.ok(!textoDeDetalle(lista, '2026-11-10', '2026-11-10', MOMENTO).includes('Horas por tema')); // un día: sin el total por tema
+});

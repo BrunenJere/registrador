@@ -3,6 +3,7 @@
 import { resumenDeSesion, resumenDeSemana, filaSemanalS03 } from './deporte.js';
 import { lunesDe, sumarDias } from './fechas.js';
 import { registrosDelPeriodo } from './resumen.js';
+import { horas, resumenDeTiempo, tiempoPorTema } from './tiempo.js';
 
 // Arma el texto de "Copiar detalle": todo lo anotado en una semana o en un día, para pasárselo a
 // Claude. Son funciones puras: reciben registros y devuelven texto; no tocan la pantalla ni el
@@ -45,15 +46,15 @@ function campoCSV(valor) {
 /**
  * La línea de un registro según su clase:
  * - plata: la fila CSV del historial;
- * - deporte: "2026-11-02 · correr · 3,2 km · 32 min · 10:00 min/km".
+ * - deporte: "2026-11-02 · correr · 3,2 km · 32 min · 10:00 min/km";
+ * - tiempo: "2026-11-14 · 90 min · GCI".
  *
  * @param {import('./tipos.js').Registro} registro
  * @returns {string}
  */
 export function lineaDeRegistro(registro) {
-  if (registro.clase === 'ejercicio') {
-    return `${registro.fecha} · ${resumenDeSesion(registro.datos)}`;
-  }
+  if (registro.clase === 'ejercicio') return `${registro.fecha} · ${resumenDeSesion(registro.datos)}`;
+  if (registro.clase === 'tiempo') return `${registro.fecha} · ${resumenDeTiempo(registro.datos)}`;
   return aFilaCSV(registro);
 }
 
@@ -85,6 +86,13 @@ export function textoDeDetalle(registros, desde, hasta, momento) {
     lineas.push('', '## Deporte', ...deporte.map(lineaDeRegistro));
     if (esSemana) {
       lineas.push('', '## Métricas de S03', filaSemanalS03(resumenDeSemana(registros, desde), desde));
+    }
+  }
+  const tiempo = delPeriodo.filter((r) => r.clase === 'tiempo');
+  if (tiempo.length > 0) {
+    lineas.push('', '## Tiempo', ...tiempo.map(lineaDeRegistro));
+    if (esSemana) {
+      lineas.push('', '## Horas por tema en la semana', ...tiempoPorTema(tiempo).map((t) => `- ${t.que}: ${horas(t.minutos)}`));
     }
   }
   if (delPeriodo.length === 0) {

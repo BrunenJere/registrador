@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarFinanza, validarEjercicio } from '../js/validar.js';
+import { validarFinanza, validarEjercicio, validarTiempo } from '../js/validar.js';
 
 const HOY = '2026-11-01';
 
@@ -154,4 +154,24 @@ test('deporte: cada ejercicio de fuerza tiene que estar completo', () => {
 test('deporte: sólo la fuerza lleva ejercicios, y la nota es corta', () => {
   assert.deepEqual(camposDeporte(sesion({ ejercicios: [SENTADILLA] })), ['actividad']);
   assert.deepEqual(camposDeporte(sesion({ nota: 'x'.repeat(201) })), ['nota']);
+});
+
+// ---------- Tiempo ----------
+
+function camposTiempo(datos, fecha = HOY) {
+  return validarTiempo({ fecha, datos: { minutos: 90, que: 'GCI', ...datos } }, HOY).map((e) => e.campo);
+}
+
+test('tiempo: completo no tiene errores', () => {
+  assert.deepEqual(camposTiempo({}), []);
+});
+
+test('tiempo: fecha, minutos entre 1 y 960 y en qué fue', () => {
+  assert.deepEqual(camposTiempo({}, '2026-11-02'), ['fecha']);
+  assert.deepEqual(camposTiempo({ minutos: null }), ['minutos']);
+  assert.deepEqual(camposTiempo({ minutos: 0 }), ['minutos']);
+  assert.deepEqual(camposTiempo({ minutos: 961 }), ['minutos']);
+  assert.deepEqual(camposTiempo({ minutos: 30.5 }), ['minutos']);
+  assert.deepEqual(camposTiempo({ que: '  ' }), ['que']);
+  assert.deepEqual(camposTiempo({ que: 'x'.repeat(121) }), ['que']);
 });
