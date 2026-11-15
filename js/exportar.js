@@ -1,22 +1,15 @@
 // @ts-check
 
-import { resumenDeSesion, lunesDe, resumenDeSemana, filaSemanalS03 } from './deporte.js';
+import { resumenDeSesion, resumenDeSemana, filaSemanalS03 } from './deporte.js';
+import { lunesDe, sumarDias } from './fechas.js';
+import { registrosDelPeriodo } from './resumen.js';
 
-// Arma lo que se le pasa a Claude en el cierre del día. Son funciones puras: reciben
-// registros y devuelven texto o listas; no tocan la pantalla ni el almacenamiento.
+// Arma el texto de "Copiar detalle": todo lo anotado en una semana o en un día, para pasárselo a
+// Claude. Son funciones puras: reciben registros y devuelven texto; no tocan la pantalla ni el
+// almacenamiento.
 //
-// La idea central es el campo `exportado_como`: guarda la línea que HOY está cargada en la
-// bóveda para ese registro (null si no hay ninguna). Comparándola con la línea que debería
-// estar, se sabe qué falta pasar:
-//
-//   debería estar   está en la bóveda   →  qué es
-//   una línea       nada (null)         →  nuevo
-//   una línea       otra línea          →  corregido
-//   nada (anulado)  una línea           →  anulado
-//   lo mismo        lo mismo            →  nada pendiente
-//
-// La línea depende de la clase: una fila CSV del historial para la plata, y una línea de texto
-// para cada sesión de deporte. Todo lo demás (pendientes, estados) es igual para las dos.
+// Desde el 14/11/2026 se copia el período entero, sin marcar qué ya se había copiado (decisión
+// del usuario): Claude lo compara con lo que está cargado en la bóveda.
 
 const ENCABEZADO_CSV = 'fecha,tipo,categoria,detalle,monto,moneda,medio,proyecto';
 
@@ -65,134 +58,54 @@ export function lineaDeRegistro(registro) {
 }
 
 /**
- * La línea que debería estar en la bóveda: ninguna si el registro está anulado.
+ * El texto de "Copiar detalle" para un período: la plata como filas del historial, el deporte
+ * en una línea por sesión y, si el período es una semana entera (de lunes a domingo) con
+ * deporte, la fila de Métricas de S03. Las secciones vacías no aparecen.
  *
- * @param {import('./tipos.js').Registro} registro
- * @returns {string | null}
- */
-export function filaEsperada(registro) {
-  return registro.anulado ? null : lineaDeRegistro(registro);
-}
-
-/**
- * En qué estado está un registro respecto de la bóveda, para mostrarlo en la lista.
- *
- * @param {import('./tipos.js').Registro} registro
- * @returns {'nuevo' | 'exportado' | 'corregido' | 'anulado'}
- */
-export function estadoDeExportacion(registro) {
-  if (registro.anulado) return 'anulado';
-  if (registro.exportado_como === null) return 'nuevo';
-  return registro.exportado_como === lineaDeRegistro(registro) ? 'exportado' : 'corregido';
-}
-
-/**
- * Separa lo que falta pasar a la bóveda, ordenado por fecha y, dentro del día, por cómo se
- * anotó.
- *
- * @param {import('./tipos.js').Registro[]} registros
- * @returns {{nuevos: import('./tipos.js').Registro[], corregidos: import('./tipos.js').Registro[], anulados: import('./tipos.js').Registro[]}}
- */
-export function pendientes(registros) {
-  const ordenados = [...registros].sort(
-    (a, b) => a.fecha.localeCompare(b.fecha) || a.creado.localeCompare(b.creado),
-  );
-
-  /** @type {ReturnType<typeof pendientes>} */
-  const resultado = { nuevos: [], corregidos: [], anulados: [] };
-
-  for (const registro of ordenados) {
-    const esperada = filaEsperada(registro);
-    const cargada = registro.exportado_como;
-
-    if (esperada === cargada) continue; // la bóveda ya está al día con este registro
-    if (cargada === null) resultado.nuevos.push(registro);
-    else if (esperada === null) resultado.anulados.push(registro);
-    else resultado.corregidos.push(registro);
-  }
-
-  return resultado;
-}
-
-/**
- * El texto que se copia para Claude: primero la plata, después el deporte y, si hubo cambios
- * de deporte, la fila de Métricas de S03 de cada semana tocada (calculada con TODOS los
- * registros de esa semana, no sólo con los pendientes).
- *
- * @param {ReturnType<typeof pendientes>} pend lo que devuelve pendientes()
- * @param {string} momento cuándo se exporta, como lo da momentoLocal()
- * @param {import('./tipos.js').Registro[]} [registros] todos los registros, para la fila semanal
+ * @param {import('./tipos.js').Registro[]} registros todos los guardados
+ * @param {string} desde "aaaa-mm-dd"
+ * @param {string} hasta "aaaa-mm-dd" (igual a desde para un día)
+ * @param {string} momento cuándo se copia, como lo da momentoLocal()
  * @returns {string}
  */
-export function textoParaClaude(pend, momento, registros = []) {
-  const { nuevos, corregidos, anulados } = pend;
-  const lineas = [
-    `REGISTRADOR · exportado el ${fechaHoraLegible(momento)}`,
-    `Nuevos: ${nuevos.length} · Corregidos: ${corregidos.length} · Anulados: ${anulados.length}`,
-  ];
+export function textoDeDetalle(registros, desde, hasta, momento) {
+  const delPeriodo = registrosDelPeriodo(registros, desde, hasta);
+  const plata = delPeriodo.filter((r) => r.clase === 'finanza');
+  const deporte = delPeriodo.filter((r) => r.clase === 'ejercicio');
+  const esSemana = desde === lunesDe(desde) && hasta === sumarDias(desde, 6);
 
-  /** @param {import('./tipos.js').Registro[]} lista */
-  const deClase = (lista, clase) => lista.filter((r) => (r.clase ?? 'finanza') === clase);
+  const periodo =
+    desde === hasta ? `día ${fechaLegible(desde)}` : `semana del ${fechaLegible(desde)} al ${fechaLegible(hasta)}`;
+  const lineas = [`REGISTRADOR · ${periodo} · copiado el ${fechaHoraLegible(momento)}`];
 
-  // ---- Plata ----
-  const plata = { nuevos: deClase(nuevos, 'finanza'), corregidos: deClase(corregidos, 'finanza'), anulados: deClase(anulados, 'finanza') };
-
-  if (plata.nuevos.length > 0) {
-    lineas.push('', '## Filas nuevas para el historial', ENCABEZADO_CSV);
-    for (const registro of plata.nuevos) lineas.push(aFilaCSV(registro));
+  if (plata.length > 0) {
+    lineas.push('', '## Plata (filas para el historial)', ENCABEZADO_CSV, ...plata.map(aFilaCSV));
   }
-  if (plata.corregidos.length > 0) {
-    lineas.push('', '## Correcciones de filas ya cargadas');
-    for (const registro of plata.corregidos) {
-      lineas.push(`antes: ${registro.exportado_como}`, `ahora: ${aFilaCSV(registro)}`);
+  if (deporte.length > 0) {
+    lineas.push('', '## Deporte', ...deporte.map(lineaDeRegistro));
+    if (esSemana) {
+      lineas.push('', '## Métricas de S03', filaSemanalS03(resumenDeSemana(registros, desde), desde));
     }
   }
-  if (plata.anulados.length > 0) {
-    lineas.push('', '## Filas anuladas (sacarlas del historial)');
-    for (const registro of plata.anulados) lineas.push(`${registro.exportado_como}`);
-  }
-
-  // ---- Deporte ----
-  const deporte = { nuevos: deClase(nuevos, 'ejercicio'), corregidos: deClase(corregidos, 'ejercicio'), anulados: deClase(anulados, 'ejercicio') };
-
-  if (deporte.nuevos.length > 0) {
-    lineas.push('', '## Deporte: sesiones nuevas');
-    for (const registro of deporte.nuevos) lineas.push(lineaDeRegistro(registro));
-  }
-  if (deporte.corregidos.length > 0) {
-    lineas.push('', '## Deporte: sesiones corregidas');
-    for (const registro of deporte.corregidos) {
-      lineas.push(`antes: ${registro.exportado_como}`, `ahora: ${lineaDeRegistro(registro)}`);
-    }
-  }
-  if (deporte.anulados.length > 0) {
-    lineas.push('', '## Deporte: sesiones anuladas');
-    for (const registro of deporte.anulados) lineas.push(`${registro.exportado_como}`);
-  }
-
-  // La fila de cada semana donde hubo algún cambio de deporte, en orden.
-  const tocadas = [...deporte.nuevos, ...deporte.corregidos, ...deporte.anulados];
-  if (tocadas.length > 0) {
-    const lunes = [...new Set(tocadas.map((r) => lunesDe(r.fecha)))].sort();
-    lineas.push('', '## Métricas de S03 (reemplazar la fila de estas semanas)');
-    for (const l of lunes) lineas.push(filaSemanalS03(resumenDeSemana(registros, l), l));
-  }
-
-  if (nuevos.length + corregidos.length + anulados.length === 0) {
-    lineas.push('', 'No hay nada pendiente.');
+  if (delPeriodo.length === 0) {
+    lineas.push('', 'No hay registros en este período.');
   }
 
   return lineas.join('\n');
 }
 
+/** "2026-11-09" → "09/11/2026", el formato de fechas de la bóveda. */
+function fechaLegible(/** @type {string} */ fecha) {
+  const [anio, mes, dia] = fecha.split('-');
+  return `${dia}/${mes}/${anio}`;
+}
+
 /**
- * "2026-11-01T22:10:05-03:00" → "01/11/2026 22:10", el formato de fechas de la bóveda.
+ * "2026-11-01T22:10:05-03:00" → "01/11/2026 22:10".
  *
  * @param {string} momento
  * @returns {string}
  */
 function fechaHoraLegible(momento) {
-  const [anio, mes, dia] = momento.slice(0, 10).split('-');
-  const horaMinutos = momento.slice(11, 16);
-  return `${dia}/${mes}/${anio} ${horaMinutos}`;
+  return `${fechaLegible(momento.slice(0, 10))} ${momento.slice(11, 16)}`;
 }

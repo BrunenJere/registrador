@@ -46,18 +46,15 @@ export function validarFinanza(registro, hoy = hoyLocal()) {
     }
   }
 
-  // Detalle: que no esté vacío (trim saca los espacios de los bordes, así "   " cuenta como vacío).
-  if (typeof datos.detalle !== 'string' || datos.detalle.trim() === '') {
-    errores.push({ campo: 'detalle', mensaje: 'Escribí un detalle.' });
+  // Detalle: opcional desde el 14/11/2026 (pedido del usuario). Si está, tiene que ser texto.
+  if (typeof datos.detalle !== 'string') {
+    errores.push({ campo: 'detalle', mensaje: 'El detalle tiene que ser texto.' });
   }
 
   // Monto.
   if (typeof datos.monto !== 'number' || !Number.isFinite(datos.monto)) {
-    // Llega null cuando leerMonto no pudo leer lo que se escribió.
-    errores.push({
-      campo: 'monto',
-      mensaje: 'El monto no es válido. Usá punto para los miles y coma para los decimales (3.500 o 3,5).',
-    });
+    // Llega null cuando el campo está vacío o leerMonto no pudo leer lo que se escribió.
+    errores.push({ campo: 'monto', mensaje: 'Escribí el monto (por ejemplo, 3.500 o 3500,50).' });
   } else if (datos.monto <= 0) {
     errores.push({ campo: 'monto', mensaje: 'El monto tiene que ser mayor que 0.' });
   } else if (!tieneHastaDosDecimales(datos.monto)) {

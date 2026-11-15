@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crearAlmacen, CLAVE, pedirPersistencia } from '../js/almacen.js';
-import { pendientes } from '../js/exportar.js';
 
 /** Un almacenamiento falso, en memoria, con lo mismo que usa la app de localStorage. */
 function storageFalso(textoInicial) {
@@ -33,12 +32,6 @@ function entrada(cambios = {}) {
       ...cambios,
     },
   };
-}
-
-/** Cuántos pendientes hay de cada clase. */
-function contar(almacen) {
-  const p = pendientes(almacen.leerTodos());
-  return { nuevos: p.nuevos.length, corregidos: p.corregidos.length, anulados: p.anulados.length };
 }
 
 test('sin nada guardado, la lista está vacía', () => {
@@ -80,74 +73,6 @@ test('editar cambia fecha, datos y actualizado; id y creado no', () => {
   assert.equal(editado.creado, MOMENTO);
 });
 
-test('editar un registro exportado lo deja como corregido', () => {
-  const almacen = crearAlmacen(storageFalso());
-  const r = almacen.agregar(entrada(), MOMENTO);
-  almacen.marcarExportados([r.id], MOMENTO);
-  almacen.editar(r.id, entrada({ monto: 4500 }), MAS_TARDE);
-  assert.deepEqual(contar(almacen), { nuevos: 0, corregidos: 1, anulados: 0 });
-});
-
-test('editar avisa si el registro no existe o está anulado', () => {
-  const almacen = crearAlmacen(storageFalso());
-  assert.throws(() => almacen.editar('no-existe', entrada()), /No se encontró/);
-
-  const r = almacen.agregar(entrada(), MOMENTO);
-  almacen.marcarExportados([r.id], MOMENTO);
-  almacen.borrar(r.id, MAS_TARDE);
-  assert.throws(() => almacen.editar(r.id, entrada()), /anulado/);
-});
-
-test('borrar un registro nunca exportado lo hace desaparecer', () => {
-  const almacen = crearAlmacen(storageFalso());
-  const r = almacen.agregar(entrada(), MOMENTO);
-  almacen.borrar(r.id, MAS_TARDE);
-  assert.deepEqual(almacen.leerTodos(), []);
-});
-
-test('borrar un registro exportado lo deja anulado, no lo saca', () => {
-  const almacen = crearAlmacen(storageFalso());
-  const r = almacen.agregar(entrada(), MOMENTO);
-  almacen.marcarExportados([r.id], MOMENTO);
-  almacen.borrar(r.id, MAS_TARDE);
-
-  const [guardado] = almacen.leerTodos();
-  assert.equal(guardado.anulado, true);
-  assert.equal(guardado.actualizado, MAS_TARDE);
-  assert.deepEqual(contar(almacen), { nuevos: 0, corregidos: 0, anulados: 1 });
-});
-
-test('marcarExportados deja todo al día y un anulado se avisa una sola vez', () => {
-  const almacen = crearAlmacen(storageFalso());
-  const a = almacen.agregar(entrada(), MOMENTO);
-  const b = almacen.agregar(entrada({ detalle: 'verdulería' }), MOMENTO);
-  almacen.marcarExportados([a.id, b.id], MOMENTO);
-  assert.deepEqual(contar(almacen), { nuevos: 0, corregidos: 0, anulados: 0 });
-
-  almacen.borrar(b.id, MAS_TARDE);
-  almacen.marcarExportados([b.id], MAS_TARDE);
-  assert.deepEqual(contar(almacen), { nuevos: 0, corregidos: 0, anulados: 0 });
-  assert.equal(almacen.leerTodos()[1].exportado_como, null);
-});
-
-test('marcarExportados no cambia actualizado', () => {
-  const almacen = crearAlmacen(storageFalso());
-  const r = almacen.agregar(entrada(), MOMENTO);
-  almacen.marcarExportados([r.id], MAS_TARDE);
-  assert.equal(almacen.leerTodos()[0].actualizado, MOMENTO);
-});
-
-test('deshacerExportacion vuelve a dejarlos pendientes', () => {
-  const almacen = crearAlmacen(storageFalso());
-  const r = almacen.agregar(entrada(), MOMENTO);
-  const copia = almacen.marcarExportados([r.id], MOMENTO);
-  almacen.deshacerExportacion(copia);
-
-  const [guardado] = almacen.leerTodos();
-  assert.equal(guardado.exportado, null);
-  assert.deepEqual(contar(almacen), { nuevos: 1, corregidos: 0, anulados: 0 });
-});
-
 test('con los datos dañados avisa y no pisa nada', () => {
   const storage = storageFalso('{esto no es JSON');
   const almacen = crearAlmacen(storage);
@@ -176,4 +101,26 @@ test('agregar guarda la clase que recibe', () => {
   );
   assert.equal(sesion.clase, 'ejercicio');
   assert.equal(almacen.leerTodos()[0].datos.km, 3.2);
+});
+
+test('editar avisa si el registro no existe o está anulado', () => {
+  const storage = storageFalso();
+  const almacen = crearAlmacen(storage);
+  assert.throws(() => almacen.editar('no-existe', entrada()), /No se encontró/);
+
+  // Un anulado de antes del 14/11/2026 (ya no se crean nuevos).
+  const r = almacen.agregar(entrada(), MOMENTO);
+  almacen.guardarTodos([{ ...r, anulado: true }]);
+  assert.throws(() => almacen.editar(r.id, entrada()), /anulado/);
+});
+
+test('borrar saca el registro siempre, aunque ya se haya copiado', () => {
+  const almacen = crearAlmacen(storageFalso());
+  const a = almacen.agregar(entrada(), MOMENTO);
+  const b = almacen.agregar(entrada({ detalle: 'verdulería' }), MOMENTO);
+  almacen.guardarTodos(almacen.leerTodos().map((r) => (r.id === a.id ? { ...r, exportado: MOMENTO } : r)));
+
+  almacen.borrar(a.id);
+  assert.deepEqual(almacen.leerTodos().map((r) => r.id), [b.id]);
+  assert.throws(() => almacen.borrar('no-existe'), /No se encontró/);
 });

@@ -28,15 +28,12 @@ export const CATEGORIAS_EGRESO = Object.freeze([
   'otros',
 ]);
 
-export const MEDIOS = Object.freeze([
-  'efectivo',
-  'débito',
-  'crédito',
-  'transferencia',
-  'mercado pago',
-]);
+// Desde el 14/11/2026 (pedido del usuario): sólo efectivo y débito, los que usa. Son dos de los
+// cinco medios del historial de la bóveda, así que el historial no cambia.
+export const MEDIOS = Object.freeze(['efectivo', 'débito']);
 
-export const MONEDAS = Object.freeze(['ARS', 'USD']);
+// Desde el 14/11/2026 todo se anota en pesos: el formulario ya no pregunta la moneda.
+export const MONEDAS = Object.freeze(['ARS']);
 
 // Actividades de una sesión de deporte. "otro" es todo lo que no es correr ni fuerza
 // (caminar, bici, la limpieza del fondo).

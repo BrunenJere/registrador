@@ -89,3 +89,31 @@ export function esFechaValida(texto) {
 export function mesDe(fecha) {
   return fecha.slice(0, 7);
 }
+
+/**
+ * Suma (o resta, con un número negativo) días a una fecha. Cruza meses y años sin problema:
+ * Date.UTC acepta "el día 32 de octubre" y lo convierte en el 1 de noviembre.
+ *
+ * @param {string} fecha "aaaa-mm-dd"
+ * @param {number} dias
+ * @returns {string} "aaaa-mm-dd"
+ */
+export function sumarDias(fecha, dias) {
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  // En UTC no hay cambios de hora ni corrimientos: toISOString da la misma fecha armada.
+  return new Date(Date.UTC(anio, mes - 1, dia + dias)).toISOString().slice(0, 10);
+}
+
+/**
+ * El lunes de la semana de una fecha (las semanas van de lunes a domingo, como en S03).
+ *
+ * @param {string} fecha "aaaa-mm-dd"
+ * @returns {string} "aaaa-mm-dd"
+ */
+export function lunesDe(fecha) {
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  // getUTCDay da 0 el domingo, 1 el lunes… 6 el sábado. Días que hay que volver hasta el lunes:
+  // lunes 0, martes 1… domingo 6.
+  const desdeElLunes = (new Date(Date.UTC(anio, mes - 1, dia)).getUTCDay() + 6) % 7;
+  return sumarDias(fecha, -desdeElLunes);
+}

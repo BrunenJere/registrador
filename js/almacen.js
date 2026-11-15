@@ -1,7 +1,6 @@
 // @ts-check
 
 import { momentoLocal } from './fechas.js';
-import { filaEsperada } from './exportar.js';
 
 // Lo único que toca localStorage.
 //
@@ -134,65 +133,15 @@ export function crearAlmacen(storage = globalThis.localStorage) {
   }
 
   /**
-   * Borra un registro. Si nunca se exportó, desaparece. Si ya se exportó, queda anulado para
-   * que la próxima exportación avise (principio 6).
+   * Borra un registro: lo saca de la lista. Desde el 14/11/2026 no queda "anulado": al copiar la
+   * semana, Claude ve que falta y lo pregunta.
    *
    * @param {string} id
-   * @param {string} [momento] cuándo se borra; por defecto, ahora
    */
-  function borrar(id, momento = momentoLocal()) {
+  function borrar(id) {
     const registros = leerTodos();
-    const registro = buscar(registros, id);
-    if (registro.exportado === null) {
-      guardarTodos(registros.filter((r) => r.id !== id));
-    } else {
-      registro.anulado = true;
-      registro.actualizado = momento;
-      guardarTodos(registros);
-    }
-  }
-
-  /**
-   * Marca registros como exportados: la fila que queda cargada en la bóveda es la esperada
-   * (null si estaba anulado, así un anulado se avisa una sola vez). No cambia `actualizado`,
-   * porque exportar no es editar.
-   *
-   * @param {string[]} ids
-   * @param {string} [momento] cuándo se exporta; por defecto, ahora
-   * @returns {CopiaDeExportacion[]} cómo estaban antes, para poder deshacer
-   */
-  function marcarExportados(ids, momento = momentoLocal()) {
-    const registros = leerTodos();
-    /** @type {CopiaDeExportacion[]} */
-    const copiaAnterior = [];
-    for (const registro of registros) {
-      if (!ids.includes(registro.id)) continue;
-      copiaAnterior.push({
-        id: registro.id,
-        exportado: registro.exportado,
-        exportado_como: registro.exportado_como,
-      });
-      registro.exportado = momento;
-      registro.exportado_como = filaEsperada(registro);
-    }
-    guardarTodos(registros);
-    return copiaAnterior;
-  }
-
-  /**
-   * Vuelve los registros a como estaban antes de marcarExportados.
-   *
-   * @param {CopiaDeExportacion[]} copiaAnterior lo que devolvió marcarExportados
-   */
-  function deshacerExportacion(copiaAnterior) {
-    const registros = leerTodos();
-    for (const copia of copiaAnterior) {
-      const registro = registros.find((r) => r.id === copia.id);
-      if (!registro) continue; // si mientras tanto se borró, no hay nada que deshacer
-      registro.exportado = copia.exportado;
-      registro.exportado_como = copia.exportado_como;
-    }
-    guardarTodos(registros);
+    buscar(registros, id); // para avisar si no existe
+    guardarTodos(registros.filter((r) => r.id !== id));
   }
 
   /**
@@ -219,19 +168,10 @@ export function crearAlmacen(storage = globalThis.localStorage) {
     agregar,
     editar,
     borrar,
-    marcarExportados,
-    deshacerExportacion,
     leerUltimoRespaldo,
     guardarUltimoRespaldo,
   };
 }
-
-/**
- * @typedef {object} CopiaDeExportacion
- * @property {string} id
- * @property {string | null} exportado
- * @property {string | null} exportado_como
- */
 
 /**
  * Busca un registro por id; si no está, lanza un error.

@@ -4,6 +4,8 @@
 // datos o texto. Todo lo que se calcula acá (ritmo, kilos movidos, la semana) no se guarda:
 // se calcula cada vez a partir de lo anotado (principio 5).
 
+import { sumarDias } from './fechas.js';
+
 // Números con coma decimal y punto de miles, como se escriben en la Argentina: 9.6 → "9,6",
 // 1250 → "1.250".
 const NUMERO = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 });
@@ -154,33 +156,6 @@ export function resumenDeSesion(d, { corto = false } = {}) {
 }
 
 // ---------- La semana ----------
-
-/**
- * El lunes de la semana de una fecha (las semanas van de lunes a domingo, como en S03).
- *
- * @param {string} fecha "aaaa-mm-dd"
- * @returns {string} "aaaa-mm-dd"
- */
-export function lunesDe(fecha) {
-  const [anio, mes, dia] = fecha.split('-').map(Number);
-  const d = new Date(Date.UTC(anio, mes - 1, dia));
-  // getUTCDay da 0 el domingo, 1 el lunes… 6 el sábado. Días que hay que volver hasta el lunes:
-  // lunes 0, martes 1… domingo 6.
-  const desdeElLunes = (d.getUTCDay() + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - desdeElLunes);
-  return d.toISOString().slice(0, 10); // en UTC no hay corrimiento: es la fecha armada arriba
-}
-
-/**
- * Suma una cantidad de días a una fecha.
- *
- * @param {string} fecha "aaaa-mm-dd"
- * @param {number} dias
- */
-function sumarDias(fecha, dias) {
-  const [anio, mes, dia] = fecha.split('-').map(Number);
-  return new Date(Date.UTC(anio, mes - 1, dia + dias)).toISOString().slice(0, 10);
-}
 
 /**
  * Lo de una semana, para la fila de Métricas de S03 y el indicador de las 168 h.

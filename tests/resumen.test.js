@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { registrosDelDia, totales, ultimoMedio } from '../js/resumen.js';
-import { estadoDeExportacion, aFilaCSV } from '../js/exportar.js';
+import { registrosDelDia, registrosDelPeriodo, totales, ultimoMedio } from '../js/resumen.js';
 
 /** Un registro mínimo para estas cuentas. */
 function registro({ id = 'a', fecha = '2026-11-01', creado = '2026-11-01T10:00:00-03:00', anulado = false, ...datos } = {}) {
@@ -50,17 +49,6 @@ test('ultimoMedio da el medio del último anotado, sin contar anulados', () => {
   assert.equal(ultimoMedio(lista), 'mercado pago');
 });
 
-test('estadoDeExportacion: nuevo, exportado, corregido y anulado', () => {
-  const r = registro();
-  assert.equal(estadoDeExportacion(r), 'nuevo');
-  r.exportado_como = aFilaCSV(r);
-  assert.equal(estadoDeExportacion(r), 'exportado');
-  r.datos.monto = 200;
-  assert.equal(estadoDeExportacion(r), 'corregido');
-  r.anulado = true;
-  assert.equal(estadoDeExportacion(r), 'anulado');
-});
-
 test('totales y ultimoMedio ignoran las sesiones de deporte', () => {
   const corrida = {
     id: 'c',
@@ -74,4 +62,24 @@ test('totales y ultimoMedio ignoran las sesiones de deporte', () => {
   const lista = [registro({ monto: 3500, medio: 'efectivo' }), corrida];
   assert.deepEqual(totales(lista), { ARS: { ingresos: 0, egresos: 3500 }, USD: { ingresos: 0, egresos: 0 } });
   assert.equal(ultimoMedio(lista), 'efectivo'); // la corrida es más nueva, pero no tiene medio
+});
+
+test('registrosDelPeriodo: entre dos fechas, sin anulados, en orden', () => {
+  const lista = [
+    registro({ id: 'jueves', fecha: '2026-11-12' }),
+    registro({ id: 'lunes-tarde', fecha: '2026-11-09', creado: '2026-11-09T20:00:00-03:00' }),
+    registro({ id: 'lunes-temprano', fecha: '2026-11-09', creado: '2026-11-09T08:00:00-03:00' }),
+    registro({ id: 'anulado', fecha: '2026-11-10', anulado: true }),
+    registro({ id: 'antes', fecha: '2026-11-08' }),
+    registro({ id: 'despues', fecha: '2026-11-16' }),
+  ];
+  assert.deepEqual(
+    registrosDelPeriodo(lista, '2026-11-09', '2026-11-15').map((r) => r.id),
+    ['lunes-temprano', 'lunes-tarde', 'jueves'],
+  );
+});
+
+test('registrosDelDia deja afuera los anulados', () => {
+  const lista = [registro({ id: 'ok' }), registro({ id: 'anulado', anulado: true })];
+  assert.deepEqual(registrosDelDia(lista, '2026-11-01').map((r) => r.id), ['ok']);
 });

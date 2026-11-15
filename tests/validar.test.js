@@ -29,10 +29,10 @@ function camposConError(registro) {
 test('un egreso y un ingreso completos no tienen errores', () => {
   assert.deepEqual(camposConError(egreso()), []);
   assert.deepEqual(
-    camposConError(egreso({ tipo: 'ingreso', categoria: 'familia', medio: 'transferencia' })),
+    camposConError(egreso({ tipo: 'ingreso', categoria: 'familia', medio: 'efectivo' })),
     [],
   );
-  assert.deepEqual(camposConError(egreso({ moneda: 'USD', monto: 0.29, proyecto: 'P05' })), []);
+  assert.deepEqual(camposConError(egreso({ monto: 0.29, proyecto: 'P05', detalle: '' })), []); // el detalle es opcional
 });
 
 test('la fecha tiene que existir y no ser futura', () => {
@@ -52,9 +52,14 @@ test('con un tipo inválido no se revisa la categoría', () => {
   assert.deepEqual(camposConError(egreso({ tipo: 'gasto' })), ['tipo']);
 });
 
-test('el detalle no puede estar vacío', () => {
-  assert.deepEqual(camposConError(egreso({ detalle: '' })), ['detalle']);
-  assert.deepEqual(camposConError(egreso({ detalle: '   ' })), ['detalle']);
+test('el detalle es opcional', () => {
+  assert.deepEqual(camposConError(egreso({ detalle: '' })), []);
+  assert.deepEqual(camposConError(egreso({ detalle: '   ' })), []);
+});
+
+test('sin monto, el mensaje pide escribirlo', () => {
+  const [error] = validarFinanza(egreso({ monto: null }), HOY);
+  assert.equal(error.mensaje, 'Escribí el monto (por ejemplo, 3.500 o 3500,50).');
 });
 
 test('el monto tiene que ser mayor que 0 y tener hasta 2 decimales', () => {
@@ -67,6 +72,8 @@ test('el monto tiene que ser mayor que 0 y tener hasta 2 decimales', () => {
 
 test('moneda y medio tienen que estar en su lista', () => {
   assert.deepEqual(camposConError(egreso({ moneda: 'EUR' })), ['moneda']);
+  assert.deepEqual(camposConError(egreso({ moneda: 'USD' })), ['moneda']); // desde el 14/11/2026, sólo pesos
+  assert.deepEqual(camposConError(egreso({ medio: 'transferencia' })), ['medio']); // sólo efectivo y débito
   assert.deepEqual(camposConError(egreso({ medio: 'cheque' })), ['medio']);
   assert.deepEqual(camposConError(egreso({ medio: '' })), ['medio']);
 });
@@ -79,7 +86,7 @@ test('el proyecto es opcional, pero si está tiene forma de ID', () => {
 
 test('informa todos los errores juntos, no sólo el primero', () => {
   const vacio = { tipo: 'egreso', categoria: '', detalle: '', monto: null, moneda: 'ARS', medio: '', proyecto: '' };
-  assert.deepEqual(camposConError({ fecha: HOY, datos: vacio }), ['categoria', 'detalle', 'monto', 'medio']);
+  assert.deepEqual(camposConError({ fecha: HOY, datos: vacio }), ['categoria', 'monto', 'medio']);
 });
 
 // ---------- Deporte ----------

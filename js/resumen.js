@@ -4,16 +4,30 @@
 // datos; la pantalla sólo los dibuja.
 
 /**
- * Los registros de un día, del más nuevo al más viejo (por cuándo se anotaron).
+ * Los registros entre dos fechas (las dos incluidas), ordenados por fecha y, dentro del día, por
+ * cómo se anotaron. Deja afuera los anulados: desde el 14/11/2026 borrar saca el registro, y los
+ * anulados que hayan quedado de antes siguen guardados, pero no se muestran ni se copian.
+ *
+ * @param {import('./tipos.js').Registro[]} registros
+ * @param {string} desde "aaaa-mm-dd"
+ * @param {string} hasta "aaaa-mm-dd"
+ * @returns {import('./tipos.js').Registro[]}
+ */
+export function registrosDelPeriodo(registros, desde, hasta) {
+  return registros
+    .filter((r) => !r.anulado && r.fecha >= desde && r.fecha <= hasta)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.creado.localeCompare(b.creado));
+}
+
+/**
+ * Los registros de un día, del más nuevo al más viejo (como se ven en la lista).
  *
  * @param {import('./tipos.js').Registro[]} registros
  * @param {string} dia "aaaa-mm-dd"
  * @returns {import('./tipos.js').Registro[]}
  */
 export function registrosDelDia(registros, dia) {
-  return registros
-    .filter((r) => r.fecha === dia)
-    .sort((a, b) => b.creado.localeCompare(a.creado));
+  return registrosDelPeriodo(registros, dia, dia).reverse();
 }
 
 /**

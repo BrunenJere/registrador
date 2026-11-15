@@ -8,7 +8,6 @@ import {
   ultimaSesionDeFuerza,
   nombresDeEjercicios,
   resumenDeSesion,
-  lunesDe,
   resumenDeSemana,
   filaSemanalS03,
 } from '../js/deporte.js';
@@ -79,14 +78,6 @@ test('resumenDeSesion: correr, fuerza y otro', () => {
 
   const otro = sesion({ actividad: 'otro', km: null, minutos: 90, detalle: 'limpieza del fondo' }).datos;
   assert.equal(resumenDeSesion(otro), 'otro · limpieza del fondo · 90 min');
-});
-
-test('lunesDe: el lunes de la semana, de lunes a domingo', () => {
-  assert.equal(lunesDe('2026-11-02'), '2026-11-02'); // lunes
-  assert.equal(lunesDe('2026-11-05'), '2026-11-02'); // jueves
-  assert.equal(lunesDe('2026-11-08'), '2026-11-02'); // domingo: todavía es la misma semana
-  assert.equal(lunesDe('2026-11-01'), '2026-10-26'); // domingo 01/11: semana anterior
-  assert.equal(lunesDe('2027-01-01'), '2026-12-28'); // cruza el año
 });
 
 test('resumenDeSemana: cuenta sólo esa semana, sin anuladas', () => {

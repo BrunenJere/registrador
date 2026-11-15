@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hoyLocal, momentoLocal, esFechaValida, mesDe } from '../js/fechas.js';
+import { hoyLocal, momentoLocal, esFechaValida, mesDe, sumarDias, lunesDe } from '../js/fechas.js';
 
 // Las pruebas corren con la zona horaria de Argentina, sea cual sea la de la computadora.
 process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -43,4 +43,20 @@ test('esFechaValida rechaza otros formatos', () => {
 
 test('mesDe da el año y el mes', () => {
   assert.equal(mesDe('2026-11-01'), '2026-11');
+});
+
+test('sumarDias suma y resta, cruzando el mes y el año', () => {
+  assert.equal(sumarDias('2026-11-14', 1), '2026-11-15');
+  assert.equal(sumarDias('2026-11-30', 1), '2026-12-01'); // cruza el mes
+  assert.equal(sumarDias('2026-12-28', 6), '2027-01-03'); // cruza el año
+  assert.equal(sumarDias('2026-11-02', -7), '2026-10-26'); // para atrás
+  assert.equal(sumarDias('2028-02-28', 1), '2028-02-29'); // bisiesto
+});
+
+test('lunesDe: el lunes de la semana, de lunes a domingo', () => {
+  assert.equal(lunesDe('2026-11-02'), '2026-11-02'); // lunes
+  assert.equal(lunesDe('2026-11-05'), '2026-11-02'); // jueves
+  assert.equal(lunesDe('2026-11-08'), '2026-11-02'); // domingo: todavía es la misma semana
+  assert.equal(lunesDe('2026-11-01'), '2026-10-26'); // domingo 01/11: semana anterior
+  assert.equal(lunesDe('2027-01-01'), '2026-12-28'); // cruza el año
 });
