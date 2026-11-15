@@ -39,6 +39,9 @@ export const MONEDAS = Object.freeze(['ARS']);
 // (caminar, bici, la limpieza del fondo).
 export const ACTIVIDADES = Object.freeze(['correr', 'fuerza', 'otro']);
 
+// Momentos de una comida (§15, paso 4).
+export const MOMENTOS = Object.freeze(['desayuno', 'almuerzo', 'merienda', 'cena', 'colación']);
+
 // Sesiones por semana que pide el proyecto de entrenamiento (S03): se muestran como "2 de 4".
 // Si cambia la rutina, se cambia acá.
 export const METAS_SEMANA = Object.freeze({ corridas: 4, fuerza: 2 });

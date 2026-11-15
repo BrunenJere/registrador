@@ -1,6 +1,6 @@
 // @ts-check
 
-import { TIPOS, CATEGORIAS_INGRESO, CATEGORIAS_EGRESO, MEDIOS, MONEDAS, ACTIVIDADES } from './listas.js';
+import { TIPOS, CATEGORIAS_INGRESO, CATEGORIAS_EGRESO, MEDIOS, MONEDAS, ACTIVIDADES, MOMENTOS } from './listas.js';
 import { hoyLocal, esFechaValida } from './fechas.js';
 
 // Un ID de proyecto de la bóveda: una letra mayúscula y dos dígitos (P05, C01, S03).
@@ -227,4 +227,57 @@ export function validarTiempo(registro, hoy = hoyLocal()) {
   }
 
   return errores;
+}
+
+/**
+ * Revisa una comida (§15, paso 4): el momento y cada alimento. Los errores de un alimento llevan
+ * el campo "item-N" (desde 0), para mostrarlos al lado de ese alimento.
+ *
+ * @param {Pick<import('./tipos.js').Registro, 'fecha' | 'datos'>} registro
+ * @param {string} [hoy]
+ * @returns {import('./tipos.js').ErrorDeValidacion[]} vacía si se puede guardar
+ */
+export function validarComida(registro, hoy = hoyLocal()) {
+  /** @type {import('./tipos.js').ErrorDeValidacion[]} */
+  const errores = [];
+  const { fecha, datos } = registro;
+  revisarFecha(fecha, hoy, errores);
+
+  if (!MOMENTOS.includes(datos.momento)) {
+    errores.push({ campo: 'momento', mensaje: 'Elegí el momento (desayuno, almuerzo…).' });
+  }
+  if (!Array.isArray(datos.items) || datos.items.length === 0) {
+    errores.push({ campo: 'items', mensaje: 'Agregá al menos un alimento.' });
+  } else {
+    datos.items.forEach((/** @type {any} */ item, /** @type {number} */ i) => {
+      const problema = problemaDeItem(item);
+      if (problema) errores.push({ campo: `item-${i}`, mensaje: `Alimento ${i + 1}: ${problema}` });
+    });
+  }
+  if (typeof datos.detalle === 'string' && datos.detalle.length > 120) {
+    errores.push({ campo: 'detalle', mensaje: 'El detalle puede tener 120 caracteres como mucho.' });
+  }
+  return errores;
+}
+
+/**
+ * El primer problema de un alimento de una comida, o null si está bien. Las kcal y los macros
+ * pueden quedar vacíos (no siempre se conocen).
+ *
+ * @param {any} item
+ * @returns {string | null}
+ */
+function problemaDeItem(item) {
+  if (typeof item?.alimento !== 'string' || item.alimento.trim() === '') return 'escribí qué comiste.';
+  const p = item.porciones;
+  if (typeof p !== 'number' || !(p > 0) || p > 20 || !tieneHastaDosDecimales(p)) {
+    return 'las porciones tienen que ser más de 0 y hasta 20 (por ejemplo, 1 o 0,5).';
+  }
+  /** @param {any} valor @param {number} tope */
+  const valorMal = (valor, tope) => valor !== null && (typeof valor !== 'number' || !(valor >= 0) || valor > tope);
+  if (valorMal(item.kcal, 5000)) return 'las kcal tienen que ser de 0 a 5.000 (o quedar vacías).';
+  if (valorMal(item.proteinas, 500) || valorMal(item.carbohidratos, 500) || valorMal(item.grasas, 500)) {
+    return 'los macros tienen que ser de 0 a 500 g (o quedar vacíos).';
+  }
+  return null;
 }
