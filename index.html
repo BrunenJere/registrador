@@ -31,6 +31,8 @@
             <select id="clase">
               <option value="plata">Plata</option>
               <option value="deporte">Deporte</option>
+              <option value="tiempo">Tiempo</option>
+              <option value="comidas">Comidas</option>
             </select>
           </div>
         </div>
@@ -76,6 +78,13 @@
 
         <!-- ============ Formulario de deporte ============ -->
         <form id="formulario-deporte" novalidate autocomplete="off" hidden>
+          <!-- Guardados: elegir uno completa el formulario; no guarda nada solo -->
+          <div class="guardados">
+            <select id="guardados-deporte" aria-label="Guardados de deporte"></select>
+            <button type="button" class="boton-secundario" id="guardar-como-deporte">Guardar como…</button>
+            <button type="button" class="boton-secundario" id="borrar-guardado-deporte" hidden>Borrar</button>
+          </div>
+
           <div class="campo">
             <div class="opciones" id="opciones-actividad" role="radiogroup" aria-label="Actividad"></div>
             <p class="error" data-error="actividad"></p>
@@ -116,6 +125,65 @@
             <button type="button" class="boton-secundario" id="boton-cancelar-deporte" hidden>Cancelar</button>
           </div>
         </form>
+
+        <!-- ============ Formulario de tiempo ============ -->
+        <form id="formulario-tiempo" novalidate autocomplete="off" hidden>
+          <div class="campo">
+            <label for="minutos-tiempo">Minutos</label>
+            <input id="minutos-tiempo" type="text" inputmode="numeric" placeholder="90" />
+            <p class="error" data-error="minutos"></p>
+          </div>
+
+          <div class="campo">
+            <label for="que-tiempo">En qué</label>
+            <input id="que-tiempo" type="text" list="temas-tiempo" placeholder="GCI, pañalera, inglés…" maxlength="120" />
+            <!-- Sugerencias: lo ya escrito -->
+            <datalist id="temas-tiempo"></datalist>
+            <p class="error" data-error="que"></p>
+          </div>
+
+          <div class="acciones">
+            <button type="submit" class="boton-principal" id="boton-guardar-tiempo">Guardar</button>
+            <button type="button" class="boton-secundario" id="boton-cancelar-tiempo" hidden>Cancelar</button>
+          </div>
+        </form>
+
+        <!-- ============ Formulario de comidas ============ -->
+        <form id="formulario-comidas" novalidate autocomplete="off" hidden>
+          <div class="guardados">
+            <select id="guardados-comidas" aria-label="Guardados de comidas"></select>
+            <button type="button" class="boton-secundario" id="guardar-como-comidas">Guardar como…</button>
+            <button type="button" class="boton-secundario" id="borrar-guardado-comidas" hidden>Borrar</button>
+          </div>
+
+          <div class="campo">
+            <div class="opciones" id="opciones-momento" role="radiogroup" aria-label="Momento"></div>
+            <p class="error" data-error="momento"></p>
+          </div>
+
+          <div class="campo">
+            <span class="etiqueta">Alimentos</span>
+            <div id="items-comida"></div>
+            <!-- Sugerencias: los de la tabla y los ya anotados -->
+            <datalist id="alimentos-comida"></datalist>
+            <p class="error" data-error="items"></p>
+            <div class="acciones">
+              <button type="button" class="boton-secundario" id="boton-agregar-item">Agregar alimento</button>
+            </div>
+            <p class="ayuda" id="totales-comida"></p>
+          </div>
+
+          <div class="campo">
+            <label for="detalle-comida">Detalle (opcional)</label>
+            <input id="detalle-comida" type="text" placeholder="en lo de la nona, afuera…" maxlength="120" />
+            <p class="error" data-error="detalle"></p>
+          </div>
+
+          <div class="acciones">
+            <button type="submit" class="boton-principal" id="boton-guardar-comidas">Guardar</button>
+            <button type="button" class="boton-secundario" id="boton-cancelar-comidas" hidden>Cancelar</button>
+          </div>
+        </form>
       </section>
 
       <!-- ============ Registros ============ -->
@@ -134,7 +202,22 @@
         <div id="semana-deporte" class="totales"></div>
         <ul id="lista-deporte" class="lista"></ul>
 
+        <!-- Tiempo y comidas aparecen sólo si hay algo anotado en el período -->
+        <div id="bloque-tiempo" hidden>
+          <h2 id="titulo-tiempo">Tiempo</h2>
+          <div id="totales-tiempo" class="totales"></div>
+          <ul id="lista-tiempo" class="lista"></ul>
+        </div>
+
+        <div id="bloque-comidas" hidden>
+          <h2 id="titulo-comidas">Comidas</h2>
+          <div id="totales-comidas" class="totales"></div>
+          <p class="ayuda" id="aviso-comidas"></p>
+          <ul id="lista-comidas" class="lista"></ul>
+        </div>
+
         <!-- Vista de semana: todo junto, agrupado por día -->
+        <h2 id="titulo-lista-semana" hidden>Día por día</h2>
         <div id="lista-semana" hidden></div>
       </section>
 
@@ -155,6 +238,26 @@
           <details>
             <summary>Ver el texto</summary>
             <pre id="texto-detalle"></pre>
+          </details>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Tabla de comidas</h2>
+          <p id="estado-tabla"></p>
+          <div class="acciones">
+            <label class="boton-principal" for="archivo-tabla">Cargar CSV</label>
+            <input id="archivo-tabla" type="file" accept=".csv,text/csv" hidden />
+            <button type="button" class="boton-secundario" id="boton-borrar-tabla" hidden>Borrar tabla</button>
+          </div>
+          <details>
+            <summary>Formato del CSV</summary>
+            <p class="ayuda">
+              Una fila de títulos y una fila por alimento, con los valores <strong>por porción</strong>. Sirve el
+              "Descargar como CSV" de Google Sheets o de Excel (con coma o punto y coma).
+            </p>
+            <pre>alimento,porcion,kcal,proteinas,carbohidratos,grasas
+Banana,1 unidad,105,1.3,27,0.4
+Arroz cocido,100 g,130,2.7,28,0.3</pre>
           </details>
         </div>
 

@@ -3,23 +3,28 @@
 // AL PUBLICAR UN CAMBIO hay que subir el número de VERSION. Si no, el celular sigue usando la
 // copia vieja. Y si se agrega un archivo a la app, hay que sumarlo a ARCHIVOS.
 
-const VERSION = 'registrador-v3';
+const VERSION = 'registrador-v4';
 
 const ARCHIVOS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/estilos.css',
-  './js/app.js',
-  './js/deporte.js',
+  './js/alimentos.js',
   './js/almacen.js',
+  './js/app.js',
+  './js/comidas.js',
+  './js/deporte.js',
   './js/exportar.js',
   './js/fechas.js',
+  './js/guardados.js',
   './js/listas.js',
   './js/numeros.js',
   './js/pantalla.js',
   './js/respaldo.js',
   './js/resumen.js',
+  './js/textos.js',
+  './js/tiempo.js',
   './js/validar.js',
   './iconos/icono.svg',
   './iconos/icono-192.png',

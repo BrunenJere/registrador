@@ -1,6 +1,16 @@
 // @ts-check
 
-import { TIPOS, CATEGORIAS_INGRESO, CATEGORIAS_EGRESO, MEDIOS, ACTIVIDADES, METAS_SEMANA } from './listas.js';
+import { TIPOS, CATEGORIAS_INGRESO, CATEGORIAS_EGRESO, MEDIOS, ACTIVIDADES, METAS_SEMANA, MOMENTOS } from './listas.js';
+
+/** @typedef {'plata' | 'deporte' | 'tiempo' | 'comidas'} ClaseDeAnotar lo que se elige en el menú "Qué" */
+
+/** El formulario de cada opción del menú "Qué". */
+const FORMULARIOS = {
+  plata: 'formulario',
+  deporte: 'formulario-deporte',
+  tiempo: 'formulario-tiempo',
+  comidas: 'formulario-comidas',
+};
 
 // Dibuja y lee la pantalla. No decide nada: recibe los datos ya calculados y avisa a app.js
 // cuando se toca algo (con las funciones que app.js le pasa, como alEditar o alBorrar).
@@ -145,22 +155,23 @@ export function leerFecha() {
  * Conecta el menú "Qué": cada vez que se elige otra opción, avisa a app.js. Se llama una vez al
  * arrancar.
  *
- * @param {(clase: 'plata' | 'deporte') => void} alCambiar
+ * @param {(clase: ClaseDeAnotar) => void} alCambiar
  */
 export function conectarMenuClase(alCambiar) {
   const menu = /** @type {HTMLSelectElement} */ ($('clase'));
-  menu.addEventListener('change', () => alCambiar(/** @type {'plata' | 'deporte'} */ (menu.value)));
+  menu.addEventListener('change', () => alCambiar(/** @type {ClaseDeAnotar} */ (menu.value)));
 }
 
 /**
- * Elige una opción del menú "Qué" y muestra su formulario.
+ * Elige una opción del menú "Qué" y muestra su formulario (y oculta los otros).
  *
- * @param {'plata' | 'deporte'} clase
+ * @param {ClaseDeAnotar} clase
  */
 export function elegirClase(clase) {
   /** @type {HTMLSelectElement} */ ($('clase')).value = clase;
-  $('formulario').hidden = clase !== 'plata';
-  $('formulario-deporte').hidden = clase !== 'deporte';
+  for (const [opcion, id] of Object.entries(FORMULARIOS)) {
+    $(id).hidden = opcion !== clase;
+  }
 }
 
 /** El título de Anotar: "Anotar" o "Editar registro". */
@@ -239,13 +250,22 @@ const FOCO_DE_CAMPO = {
     minutos: '#minutos',
     detalle: '#detalle-deporte',
   },
+  'formulario-tiempo': {
+    minutos: '#minutos-tiempo',
+    que: '#que-tiempo',
+  },
+  'formulario-comidas': {
+    momento: '#opciones-momento button',
+    items: '#boton-agregar-item',
+    detalle: '#detalle-comida',
+  },
 };
 
 /**
  * Muestra cada error al lado de su campo y lleva el foco al primero.
  *
  * @param {import('./tipos.js').ErrorDeValidacion[]} errores
- * @param {'formulario' | 'formulario-deporte'} idFormulario
+ * @param {'formulario' | 'formulario-deporte' | 'formulario-tiempo' | 'formulario-comidas'} idFormulario
  */
 export function mostrarErrores(errores, idFormulario) {
   const formulario = $(idFormulario);
@@ -272,9 +292,10 @@ export function mostrarErrores(errores, idFormulario) {
  */
 function focoDe(formulario, idFormulario, nombre) {
   if (nombre === 'fecha') return $('fecha-registro');
-  const ejercicio = /^ejercicio-(\d+)$/.exec(nombre);
-  if (ejercicio) {
-    return formulario.querySelectorAll('.fila-ejercicio')[Number(ejercicio[1])]?.querySelector('input') ?? null;
+  // "ejercicio-1" o "item-1": el primer campo de esa fila (las dos usan la clase fila-ejercicio).
+  const fila = /^(?:ejercicio|item)-(\d+)$/.exec(nombre);
+  if (fila) {
+    return formulario.querySelectorAll('.fila-ejercicio')[Number(fila[1])]?.querySelector('input') ?? null;
   }
   const selector = FOCO_DE_CAMPO[idFormulario][nombre];
   return selector ? formulario.querySelector(selector) : null;
@@ -451,6 +472,230 @@ export function conectarFormularioDeporte() {
   campo('minutos').addEventListener('input', actualizarRitmo);
 }
 
+// ---------- Formulario de tiempo ----------
+
+/**
+ * Llena el formulario de tiempo.
+ *
+ * @param {{minutos: string, que: string, temas: string[], editando: boolean}} v
+ */
+export function dibujarFormularioTiempo(v) {
+  campo('minutos-tiempo').value = v.minutos;
+  campo('que-tiempo').value = v.que;
+  $('temas-tiempo').replaceChildren(...v.temas.map((tema) => el('option', { value: tema })));
+  ponerTitulo(v.editando);
+  $('boton-guardar-tiempo').textContent = v.editando ? 'Guardar cambios' : 'Guardar';
+  $('boton-cancelar-tiempo').hidden = !v.editando;
+  limpiarErrores($('formulario-tiempo'));
+}
+
+/** Lo cargado en el formulario de tiempo; los minutos como texto. */
+export function leerFormularioTiempo() {
+  return { minutosTexto: campo('minutos-tiempo').value, que: campo('que-tiempo').value.trim() };
+}
+
+// ---------- Formulario de comidas ----------
+
+/**
+ * Un alimento como se escribe en el formulario: todo texto, lo convierte app.js.
+ *
+ * @typedef {object} ItemTexto
+ * @property {string} alimento
+ * @property {string} porciones
+ * @property {string} kcal
+ * @property {string} proteinas
+ * @property {string} carbohidratos
+ * @property {string} grasas
+ */
+
+/**
+ * Lo que pantalla.js necesita de app.js para el formulario de comidas:
+ * - buscarEnTabla: si el alimento está en la tabla, sus valores para esas porciones (como texto)
+ *   y lo que es una porción; si no, null;
+ * - totalDeItems: la línea de totales de la comida ("Total: 650 kcal · …") o ''.
+ */
+let ayudaComidas = {
+  /** @type {(alimento: string, porciones: string) => ({valores: Omit<ItemTexto, 'alimento' | 'porciones'>, porcion: string} | null)} */
+  buscarEnTabla: () => null,
+  /** @type {(items: ItemTexto[]) => string} */
+  totalDeItems: () => '',
+};
+
+/**
+ * Llena el formulario de comidas.
+ *
+ * @param {{momento: string, items: ItemTexto[], detalle: string, alimentos: string[], editando: boolean}} v
+ * @param {typeof ayudaComidas} ayuda
+ */
+export function dibujarFormularioComida(v, ayuda) {
+  ayudaComidas = ayuda;
+  dibujarOpciones($('opciones-momento'), MOMENTOS, v.momento);
+  campo('detalle-comida').value = v.detalle;
+  $('alimentos-comida').replaceChildren(...v.alimentos.map((nombre) => el('option', { value: nombre })));
+  cargarItemsComida(v.items);
+  ponerTitulo(v.editando);
+  $('boton-guardar-comidas').textContent = v.editando ? 'Guardar cambios' : 'Guardar';
+  $('boton-cancelar-comidas').hidden = !v.editando;
+  limpiarErrores($('formulario-comidas'));
+}
+
+/**
+ * Reemplaza los alimentos del formulario (lo usan también los guardados).
+ *
+ * @param {ItemTexto[]} items
+ */
+export function cargarItemsComida(items) {
+  $('items-comida').replaceChildren(...items.map(filaDeItem));
+  numerarErroresDeItems();
+  actualizarTotalesComida();
+}
+
+/** Suma un alimento vacío (con 1 porción) y pone el foco en su nombre. */
+export function agregarItemComida() {
+  const fila = filaDeItem({ alimento: '', porciones: '1', kcal: '', proteinas: '', carbohidratos: '', grasas: '' });
+  $('items-comida').append(fila);
+  numerarErroresDeItems();
+  fila.querySelector('input')?.focus();
+}
+
+/**
+ * Una fila de alimento: el nombre (con sugerencias), porciones y kcal, y los tres macros con el
+ * botón para quitarla. Si el nombre está en la tabla, completa los valores para las porciones y
+ * los recalcula cuando cambian; después se pueden editar a mano.
+ *
+ * @param {ItemTexto} item
+ * @returns {HTMLElement}
+ */
+function filaDeItem(item) {
+  /** @param {string} etiqueta @param {string} clase @param {string} valor */
+  const numero = (etiqueta, clase, valor) => {
+    const entrada = el('input', { type: 'text', inputmode: 'decimal', class: clase, 'aria-label': etiqueta });
+    /** @type {HTMLInputElement} */ (entrada).value = valor;
+    return el('div', {}, el('label', {}, etiqueta), entrada);
+  };
+  const nombre = el('input', { type: 'text', class: 'nombre', list: 'alimentos-comida', placeholder: 'banana, milanesa…', 'aria-label': 'Alimento', maxlength: '60' });
+  /** @type {HTMLInputElement} */ (nombre).value = item.alimento;
+  const porcion = el('p', { class: 'ayuda' });
+  const quitar = el('button', { type: 'button', class: 'quitar', 'aria-label': 'Quitar alimento' }, '✕');
+
+  const fila = el(
+    'div',
+    { class: 'fila-ejercicio fila-item' },
+    nombre,
+    porcion,
+    el('div', { class: 'numeros' }, numero('Porciones', 'porciones', item.porciones), numero('Kcal', 'kcal', item.kcal)),
+    el(
+      'div',
+      { class: 'macros' },
+      numero('Prot. (g)', 'proteinas', item.proteinas),
+      numero('Carb. (g)', 'carbohidratos', item.carbohidratos),
+      numero('Grasas (g)', 'grasas', item.grasas),
+      quitar,
+    ),
+    el('p', { class: 'error' }),
+  );
+
+  /** @param {string} clase */
+  const entrada = (clase) => /** @type {HTMLInputElement} */ (fila.querySelector(`.${clase}`));
+  const completarDesdeTabla = () => {
+    const encontrado = ayudaComidas.buscarEnTabla(entrada('nombre').value, entrada('porciones').value);
+    porcion.textContent = encontrado ? `De la tabla · 1 porción = ${encontrado.porcion}` : '';
+    if (encontrado) {
+      for (const [clave, valor] of Object.entries(encontrado.valores)) entrada(clave).value = valor;
+    }
+    actualizarTotalesComida();
+  };
+  nombre.addEventListener('change', completarDesdeTabla);
+  entrada('porciones').addEventListener('input', completarDesdeTabla);
+  for (const clave of ['kcal', 'proteinas', 'carbohidratos', 'grasas']) {
+    entrada(clave).addEventListener('input', actualizarTotalesComida);
+  }
+  quitar.addEventListener('click', () => {
+    fila.remove();
+    numerarErroresDeItems();
+    actualizarTotalesComida();
+  });
+  // Al cargar una fila con un alimento de la tabla, se muestra qué es una porción.
+  if (item.alimento) {
+    const encontrado = ayudaComidas.buscarEnTabla(item.alimento, item.porciones);
+    porcion.textContent = encontrado ? `De la tabla · 1 porción = ${encontrado.porcion}` : '';
+  }
+  return fila;
+}
+
+/** Cada alimento tiene su lugar de error ("item-0", "item-1"…), como en validarComida. */
+function numerarErroresDeItems() {
+  $('items-comida')
+    .querySelectorAll('.fila-item')
+    .forEach((fila, i) => fila.querySelector(':scope > .error')?.setAttribute('data-error', `item-${i}`));
+}
+
+/** Los totales de la comida, debajo de los alimentos, mientras se escribe. */
+function actualizarTotalesComida() {
+  $('totales-comida').textContent = ayudaComidas.totalDeItems(leerItemsComida());
+}
+
+/** Los alimentos cargados, como texto; los totalmente vacíos se ignoran. */
+function leerItemsComida() {
+  return [...$('items-comida').querySelectorAll('.fila-item')]
+    .map((fila) => {
+      const valor = (/** @type {string} */ clase) => /** @type {HTMLInputElement} */ (fila.querySelector(`.${clase}`)).value.trim();
+      return {
+        alimento: valor('nombre'),
+        porciones: valor('porciones'),
+        kcal: valor('kcal'),
+        proteinas: valor('proteinas'),
+        carbohidratos: valor('carbohidratos'),
+        grasas: valor('grasas'),
+      };
+    })
+    .filter((i) => i.alimento || i.kcal || i.proteinas || i.carbohidratos || i.grasas);
+}
+
+/** Lo cargado en el formulario de comidas, todo como texto. */
+export function leerFormularioComida() {
+  return {
+    momento: valorElegido('opciones-momento'),
+    items: leerItemsComida(),
+    detalle: campo('detalle-comida').value.trim(),
+  };
+}
+
+// ---------- Guardados ----------
+
+/**
+ * Llena el menú de guardados de deporte o de comidas.
+ *
+ * @param {'deporte' | 'comidas'} donde
+ * @param {{id: string, nombre: string}[]} guardados ya ordenados
+ * @param {string} [elegido] el id que queda elegido ('' para ninguno)
+ */
+export function dibujarGuardados(donde, guardados, elegido = '') {
+  const menu = /** @type {HTMLSelectElement} */ ($(`guardados-${donde}`));
+  const vacio = guardados.length === 0 ? 'Todavía no hay guardados' : 'Elegir un guardado…';
+  menu.replaceChildren(el('option', { value: '' }, vacio), ...guardados.map((g) => el('option', { value: g.id }, g.nombre)));
+  menu.value = elegido;
+  $(`borrar-guardado-${donde}`).hidden = elegido === '';
+}
+
+/**
+ * Conecta el menú y los botones de guardados. Se llama una vez al arrancar, por cada formulario.
+ *
+ * @param {'deporte' | 'comidas'} donde
+ * @param {{alElegir: (id: string) => void, alGuardarComo: () => void, alBorrar: (id: string) => void}} acciones
+ */
+export function conectarGuardados(donde, { alElegir, alGuardarComo, alBorrar }) {
+  const menu = /** @type {HTMLSelectElement} */ ($(`guardados-${donde}`));
+  menu.addEventListener('change', () => {
+    $(`borrar-guardado-${donde}`).hidden = menu.value === '';
+    if (menu.value) alElegir(menu.value);
+  });
+  $(`guardar-como-${donde}`).addEventListener('click', alGuardarComo);
+  $(`borrar-guardado-${donde}`).addEventListener('click', () => {
+    if (menu.value) alBorrar(menu.value);
+  });
+}
+
 // ---------- Registros ----------
 
 /**
@@ -479,8 +724,25 @@ export function leerFechaRegistros() {
 }
 
 /**
- * Registros, vista de un día: la plata del día y, para el deporte, la semana arriba y las
- * sesiones del día abajo.
+ * Cómo describir cada clase en una línea (las funciones vienen de app.js).
+ *
+ * @typedef {object} Resumidores
+ * @property {(datos: any) => string} sesion  "correr · 3,2 km · 32 min · 10:00 min/km"
+ * @property {(datos: any) => string} comida  "almuerzo · milanesa x1 · 600 kcal"
+ */
+
+/**
+ * @typedef {object} TotalesDeComidas
+ * @property {number} kcal
+ * @property {number} proteinas
+ * @property {number} carbohidratos
+ * @property {number} grasas
+ * @property {number} sinValores
+ */
+
+/**
+ * Registros, vista de un día: la plata del día; el deporte (la semana arriba y las sesiones del
+ * día abajo); y, si hay, el tiempo y las comidas del día.
  *
  * @param {object} p
  * @param {import('./tipos.js').Registro[]} p.plata los de plata del día, ya ordenados
@@ -488,10 +750,13 @@ export function leerFechaRegistros() {
  * @param {string} p.lunes el lunes de esa semana
  * @param {{corridas: number, fuerza: number, km: number, minutos: number}} p.semana
  * @param {import('./tipos.js').Registro[]} p.sesiones las de deporte del día, ya ordenadas
- * @param {(datos: import('./tipos.js').DatosEjercicio) => string} p.resumirSesion la línea corta de una sesión
+ * @param {import('./tipos.js').Registro[]} p.tiempo los de tiempo del día
+ * @param {import('./tipos.js').Registro[]} p.comidas las comidas del día
+ * @param {TotalesDeComidas} p.totalesComidas
+ * @param {Resumidores} p.resumir
  * @param {Acciones} p.acciones
  */
-export function dibujarRegistrosDia({ plata, totales, lunes, semana, sesiones, resumirSesion, acciones }) {
+export function dibujarRegistrosDia({ plata, totales, lunes, semana, sesiones, tiempo, comidas, totalesComidas, resumir, acciones }) {
   mostrarListasDe('día');
   $('titulo-plata').textContent = 'Plata del día';
   dibujarTotales(totales);
@@ -499,28 +764,58 @@ export function dibujarRegistrosDia({ plata, totales, lunes, semana, sesiones, r
   dibujarLista($('lista'), plata.map((r) => itemDePlata(r, acciones)), 'No hay plata anotada este día.');
   dibujarLista(
     $('lista-deporte'),
-    sesiones.map((r) => itemDeSesion(r, resumirSesion, acciones)),
+    sesiones.map((r) => itemDeSesion(r, resumir.sesion, acciones)),
     'No hay sesiones este día.',
   );
+
+  $('bloque-tiempo').hidden = tiempo.length === 0;
+  $('titulo-tiempo').textContent = 'Tiempo del día';
+  const minutos = tiempo.reduce((suma, r) => suma + (r.datos.minutos ?? 0), 0);
+  $('totales-tiempo').replaceChildren(total('Total', `${NUMERO_AR.format(minutos / 60)} h`));
+  dibujarLista($('lista-tiempo'), tiempo.map((r) => itemDeTiempo(r, acciones)), '');
+
+  $('bloque-comidas').hidden = comidas.length === 0;
+  $('titulo-comidas').textContent = 'Comidas del día';
+  dibujarTotalesComidas(totalesComidas);
+  dibujarLista($('lista-comidas'), comidas.map((r) => itemDeComida(r, resumir.comida, acciones)), '');
 }
 
 /**
  * Registros, vista de una semana (de lunes a domingo): los totales de plata, el resumen de
- * deporte y todos los registros agrupados por día.
+ * deporte, el tiempo por tema y las comidas (si hay), y todos los registros agrupados por día.
  *
  * @param {object} p
  * @param {string} p.lunes
  * @param {ReturnType<typeof import('./resumen.js').totales>} p.totales los de toda la semana
  * @param {{corridas: number, fuerza: number, km: number, minutos: number}} p.semana
+ * @param {{que: string, minutos: number}[]} p.porTema el tiempo de la semana por tema
+ * @param {TotalesDeComidas} p.totalesComidas los de la semana
+ * @param {number} p.diasConComidas para el promedio por día
  * @param {import('./tipos.js').Registro[]} p.registros los de la semana, en orden
- * @param {(datos: import('./tipos.js').DatosEjercicio) => string} p.resumirSesion
+ * @param {Resumidores} p.resumir
  * @param {Acciones} p.acciones
  */
-export function dibujarRegistrosSemana({ lunes, totales, semana, registros, resumirSesion, acciones }) {
+export function dibujarRegistrosSemana({ lunes, totales, semana, porTema, totalesComidas, diasConComidas, registros, resumir, acciones }) {
   mostrarListasDe('semana');
   $('titulo-plata').textContent = `Plata de la semana del ${fechaLegible(lunes)}`;
   dibujarTotales(totales);
   dibujarSemanaDeporte(lunes, semana);
+
+  $('bloque-tiempo').hidden = porTema.length === 0;
+  $('titulo-tiempo').textContent = 'Tiempo de la semana';
+  const minutos = porTema.reduce((suma, t) => suma + t.minutos, 0);
+  $('totales-tiempo').replaceChildren(
+    total('Total', `${NUMERO_AR.format(minutos / 60)} h`),
+    ...porTema.slice(0, 5).map((t) => total(t.que, `${NUMERO_AR.format(t.minutos / 60)} h`)), // los 5 temas con más horas
+  );
+
+  $('bloque-comidas').hidden = diasConComidas === 0;
+  $('titulo-comidas').textContent = 'Comidas de la semana';
+  $('totales-comidas').replaceChildren(
+    total('Kcal en la semana', NUMERO_AR.format(totalesComidas.kcal)),
+    total('Promedio por día', NUMERO_AR.format(diasConComidas > 0 ? totalesComidas.kcal / diasConComidas : 0)),
+  );
+  $('aviso-comidas').textContent = avisoSinValores(totalesComidas.sinValores);
 
   const contenedor = $('lista-semana');
   if (registros.length === 0) {
@@ -539,20 +834,80 @@ export function dibujarRegistrosSemana({ lunes, totales, semana, registros, resu
       lista = el('ul', { class: 'lista' });
       bloques.push(el('h3', { class: 'titulo-dia' }, diaConNombre(fechaActual)), lista);
     }
-    lista?.append(
-      registro.clase === 'ejercicio'
-        ? itemDeSesion(registro, resumirSesion, acciones)
-        : itemDePlata(registro, acciones),
-    );
+    lista?.append(itemSegunClase(registro, resumir, acciones));
   }
   contenedor.replaceChildren(...bloques);
 }
 
-/** En la vista de día se ven las dos listas de siempre; en la de semana, la lista agrupada. */
+/** El item de la lista que corresponde a la clase del registro. */
+function itemSegunClase(/** @type {import('./tipos.js').Registro} */ registro, /** @type {Resumidores} */ resumir, /** @type {Acciones} */ acciones) {
+  if (registro.clase === 'ejercicio') return itemDeSesion(registro, resumir.sesion, acciones);
+  if (registro.clase === 'tiempo') return itemDeTiempo(registro, acciones);
+  if (registro.clase === 'comida') return itemDeComida(registro, resumir.comida, acciones);
+  return itemDePlata(registro, acciones);
+}
+
+/** En la vista de día se ven las listas de cada clase; en la de semana, la lista agrupada. */
 function mostrarListasDe(/** @type {'día' | 'semana'} */ vista) {
-  $('lista').hidden = vista !== 'día';
-  $('lista-deporte').hidden = vista !== 'día';
+  for (const id of ['lista', 'lista-deporte', 'lista-tiempo', 'lista-comidas']) $(id).hidden = vista !== 'día';
   $('lista-semana').hidden = vista !== 'semana';
+  $('titulo-lista-semana').hidden = vista !== 'semana';
+}
+
+/** Las tarjetas de kcal y macros de las comidas de un día. */
+function dibujarTotalesComidas(/** @type {TotalesDeComidas} */ t) {
+  $('totales-comidas').replaceChildren(
+    total('Kcal', NUMERO_AR.format(t.kcal)),
+    total('Proteínas', `${NUMERO_AR.format(t.proteinas)} g`),
+    total('Carbohidratos', `${NUMERO_AR.format(t.carbohidratos)} g`),
+    total('Grasas', `${NUMERO_AR.format(t.grasas)} g`),
+  );
+  $('aviso-comidas').textContent = avisoSinValores(t.sinValores);
+}
+
+/** Aclara que el total no está completo si a algún alimento le faltan los valores. */
+function avisoSinValores(/** @type {number} */ sinValores) {
+  if (sinValores === 0) return '';
+  return `${sinValores} alimento${sinValores === 1 ? '' : 's'} sin kcal: el total no los cuenta.`;
+}
+
+/**
+ * Un registro de tiempo en la lista: en qué fue y los minutos.
+ *
+ * @param {import('./tipos.js').Registro} registro
+ * @param {Acciones} acciones
+ */
+function itemDeTiempo(registro, acciones) {
+  return itemDeLista({
+    registro,
+    titulo: registro.datos.que,
+    meta: 'Tiempo',
+    derecha: `${registro.datos.minutos} min`,
+    claseDerecha: '',
+    acciones,
+  });
+}
+
+/**
+ * Una comida en la lista: el momento, los alimentos y las kcal (si se conocen).
+ *
+ * @param {import('./tipos.js').Registro} registro
+ * @param {(datos: any) => string} resumirComida
+ * @param {Acciones} acciones
+ */
+function itemDeComida(registro, resumirComida, acciones) {
+  // "almuerzo · milanesa x1, ensalada x0,5 · 650,4 kcal · detalle" → título "Almuerzo",
+  // las kcal a la derecha y el resto en la línea chica.
+  const [momento, ...resto] = resumirComida(registro.datos).split(' · ');
+  const kcal = resto.find((parte) => parte.includes('kcal')) ?? '';
+  return itemDeLista({
+    registro,
+    titulo: conMayuscula(momento),
+    meta: resto.filter((parte) => parte !== kcal).join(' · '),
+    derecha: kcal.replace(/ \(.*\)$/, ''), // "600 kcal (1 sin datos)" → "600 kcal"
+    claseDerecha: '',
+    acciones,
+  });
 }
 
 /** Las tarjetas de ingresos y egresos (y las de USD, si hay registros viejos en dólares). */
@@ -696,8 +1051,14 @@ export function leerFechaDetalle() {
  * @param {string} p.hasta "aaaa-mm-dd"
  * @param {string} p.texto lo que se va a copiar, para "Ver el texto"
  * @param {string | null} p.ultimoRespaldo
+ * @param {number} p.alimentosEnTabla cuántos alimentos tiene la tabla de comidas
  */
-export function dibujarConfiguracion({ desde, hasta, texto, ultimoRespaldo }) {
+export function dibujarConfiguracion({ desde, hasta, texto, ultimoRespaldo, alimentosEnTabla }) {
+  $('estado-tabla').textContent =
+    alimentosEnTabla > 0
+      ? `Hay ${alimentosEnTabla} alimento${alimentosEnTabla === 1 ? '' : 's'} cargado${alimentosEnTabla === 1 ? '' : 's'}.`
+      : 'No hay tabla cargada. Sin tabla, las kcal y los macros se escriben a mano (o quedan vacíos).';
+  $('boton-borrar-tabla').hidden = alimentosEnTabla === 0;
   $('periodo-detalle').textContent =
     desde === hasta ? `Se copia el ${diaConNombre(desde)}.` : `Se copia del ${diaConNombre(desde)} al ${diaConNombre(hasta)}.`;
   $('texto-detalle').textContent = texto;

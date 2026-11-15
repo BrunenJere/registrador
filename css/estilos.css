@@ -233,8 +233,45 @@ select:focus-visible {
 }
 
 #formulario,
-#formulario-deporte {
+#formulario-deporte,
+#formulario-tiempo,
+#formulario-comidas {
   margin-top: 16px;
+}
+
+/* Guardados: el menú y sus botones en un renglón (si no entran, bajan). */
+.guardados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.guardados select {
+  flex: 1 1 100%;
+}
+
+.guardados .boton-secundario {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+/* Un alimento de una comida: el nombre arriba; porciones y kcal; después los tres macros. */
+.fila-ejercicio.fila-item .numeros {
+  grid-template-columns: 1fr 1fr; /* gana a la de ejercicios (4 columnas) por ser más específica */
+}
+
+.fila-item .macros {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: end;
+}
+
+.fila-item .ayuda {
+  margin-top: 4px;
 }
 
 /* ---------- Deporte ---------- */

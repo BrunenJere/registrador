@@ -28,9 +28,9 @@ revisa conmigo antes de pasar a la siguiente.
 | Plata | Ingresos y egresos, respaldo, uso sin conexión | Hecha |
 | Deporte | Correr, fuerza y otras actividades, con el resumen de la semana | Hecha |
 | Registros y Configuración | Ver el día o la semana; copiar el detalle | Hecha |
-| Tiempo | Minutos y en qué fueron | Pendiente |
-| Guardados | Sesiones y comidas que completan el formulario | Pendiente |
-| Comidas | Con calorías y macros desde una hoja de cálculo | Pendiente |
+| Tiempo | Minutos y en qué fueron, con las horas por tema | Hecha |
+| Guardados | Sesiones y comidas que completan el formulario | Hecha |
+| Comidas | Con calorías y macros desde una hoja de cálculo (CSV) | Hecha |
 | Texto libre y voz | Escribir o dictar una frase y que la app la entienda | Postergado |
 
 ## Stack
