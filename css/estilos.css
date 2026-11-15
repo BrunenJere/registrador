@@ -190,11 +190,54 @@ summary {
   opacity: 0.5;
 }
 
-/* ---------- Deporte ---------- */
+/* ---------- Fila de arriba: fecha y menú (Anotar), vista y fecha (Registros, Configuración) ---------- */
 
-.selector-clase {
-  margin-bottom: 20px;
+.fila-superior {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 8px;
 }
+
+.fila-superior .campo {
+  margin-bottom: 0;
+}
+
+/* Día | Semana al lado de la fecha: los dos botones siempre en un renglón, aunque la tarjeta
+   de Configuración sea más angosta. */
+.fila-superior .opciones {
+  flex-wrap: nowrap;
+}
+
+.fila-superior .opciones button {
+  flex: 1 1 auto; /* cada botón, del ancho de su texto: "Semana" necesita más que "Día" */
+  padding: 10px 6px;
+  font-size: 0.95rem;
+}
+
+select {
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  color: inherit;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  min-height: 48px;
+}
+
+select:focus-visible {
+  outline: 3px solid var(--principal);
+  outline-offset: 2px;
+}
+
+#formulario,
+#formulario-deporte {
+  margin-top: 16px;
+}
+
+/* ---------- Deporte ---------- */
 
 .ayuda {
   color: var(--texto-suave);
@@ -244,8 +287,16 @@ summary {
   cursor: pointer;
 }
 
-#pestana-hoy h2 {
+#pestana-registros h2 {
   margin-top: 24px;
+}
+
+/* Vista de semana: el nombre de cada día arriba de sus registros. */
+.titulo-dia {
+  font-size: 0.95rem;
+  color: var(--texto-suave);
+  margin: 20px 0 8px;
+  text-transform: capitalize;
 }
 
 /* ---------- Hoy ---------- */

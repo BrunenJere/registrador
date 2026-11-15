@@ -3,34 +3,40 @@
 import { crearAlmacen, pedirPersistencia } from './almacen.js';
 import {
   formatearRitmo,
-  lunesDe,
   nombresDeEjercicios,
   resumenDeSemana,
   resumenDeSesion,
   segundosPorKm,
   ultimaSesionDeFuerza,
 } from './deporte.js';
-import { estadoDeExportacion, pendientes, textoParaClaude } from './exportar.js';
-import { hoyLocal, momentoLocal } from './fechas.js';
+import { textoDeDetalle } from './exportar.js';
+import { hoyLocal, lunesDe, momentoLocal, sumarDias } from './fechas.js';
 import { leerEntero, leerMonto } from './numeros.js';
 import { descargarRespaldo, importarRespaldo, tocaRespaldo } from './respaldo.js';
-import { registrosDelDia, totales, ultimoMedio } from './resumen.js';
+import { registrosDelDia, registrosDelPeriodo, totales, ultimoMedio } from './resumen.js';
 import { validarEjercicio, validarFinanza } from './validar.js';
 import {
   agregarEjercicio,
   cargarEjercicios,
   conectarFormularioDeporte,
-  dibujarDeporteHoy,
-  dibujarExportar,
+  conectarMenuClase,
+  dibujarConfiguracion,
   dibujarFormulario,
   dibujarFormularioDeporte,
-  dibujarHoy,
-  dibujarSelectorClase,
+  dibujarPeriodoDetalle,
+  dibujarRegistrosDia,
+  dibujarRegistrosSemana,
+  dibujarVistaRegistros,
+  elegirClase,
+  leerFecha,
+  leerFechaDetalle,
+  leerFechaRegistros,
   leerFormulario,
   leerFormularioDeporte,
   mostrarAviso,
   mostrarErrores,
   mostrarPestana,
+  ponerFecha,
 } from './pantalla.js';
 
 // Arranque y conexiones: cada botón llama a la lógica y después se vuelve a dibujar.
@@ -46,10 +52,10 @@ const estado = {
   editandoId: null,
   /** @type {string} la última actividad anotada, para dejarla elegida en el formulario */
   ultimaActividad: 'correr',
-  /** @type {import('./almacen.js').CopiaDeExportacion[] | null} para Deshacer la última exportación */
-  copiaExportacion: null,
-  /** @type {string | null} el último texto copiado, para poder volver a verlo */
-  ultimoTexto: null,
+  /** @type {'día' | 'semana'} qué se ve en Registros */
+  vista: 'día',
+  /** @type {'semana' | 'día'} qué se copia en Configuración */
+  periodo: 'semana',
 };
 
 /** Lee los registros; si están dañados, avisa y devuelve una lista vacía para no romper la app. */
@@ -73,7 +79,12 @@ function aTexto(/** @type {number | null} */ numero) {
   return numero === null ? '' : String(numero).replace('.', ',');
 }
 
-// ---------- Plata | Deporte ----------
+/** El registro que se está editando, o null si se está anotando uno nuevo. */
+function registroEditado() {
+  return estado.editandoId ? (leerRegistros().find((r) => r.id === estado.editandoId) ?? null) : null;
+}
+
+// ---------- Qué se anota ----------
 
 /** Cambia el formulario que se ve. Si se estaba editando algo, se cancela la edición. */
 function alCambiarClase(/** @type {'plata' | 'deporte'} */ clase) {
@@ -81,8 +92,9 @@ function alCambiarClase(/** @type {'plata' | 'deporte'} */ clase) {
   if (estado.editandoId) {
     formularioNuevo();
     formularioDeporteNuevo();
+    ponerFecha(hoyLocal());
   }
-  dibujarSelectorClase(clase, alCambiarClase);
+  elegirClase(clase);
 }
 
 // ---------- Formulario de plata ----------
@@ -94,11 +106,8 @@ function formularioNuevo() {
     tipo: 'egreso',
     categoria: '',
     medio: ultimoMedio(leerRegistros()),
-    moneda: 'ARS',
     monto: '',
     detalle: '',
-    fecha: hoyLocal(),
-    proyecto: '',
     editando: false,
   });
 }
@@ -106,8 +115,17 @@ function formularioNuevo() {
 /** Guardar plata: convertir el monto, validar y, si no hay errores, agregar o editar. */
 function alGuardar(/** @type {SubmitEvent} */ evento) {
   evento.preventDefault(); // que el formulario no recargue la página
-  const { fecha, montoTexto, datos } = leerFormulario();
-  const registro = { fecha, datos: { ...datos, monto: leerMonto(montoTexto) } };
+  const { montoTexto, datos } = leerFormulario();
+  const original = registroEditado();
+  const registro = {
+    fecha: leerFecha(),
+    datos: {
+      ...datos,
+      monto: leerMonto(montoTexto),
+      moneda: 'ARS', // desde el 14/11/2026 todo se anota en pesos
+      proyecto: original?.datos.proyecto ?? '', // ya no se pregunta; al editar, se conserva
+    },
+  };
 
   const errores = validarFinanza(registro);
   if (errores.length > 0) {
@@ -129,8 +147,6 @@ function formularioDeporteNuevo() {
       minutos: '',
       detalle: '',
       ejercicios: [],
-      nota: '',
-      fecha: hoyLocal(),
       nombres: nombresDeEjercicios(leerRegistros()),
       editando: false,
     },
@@ -160,8 +176,9 @@ function alGuardarDeporte(/** @type {SubmitEvent} */ evento) {
   evento.preventDefault();
   const f = leerFormularioDeporte();
   const esFuerza = f.actividad === 'fuerza';
+  const original = registroEditado();
   const registro = {
-    fecha: f.fecha,
+    fecha: leerFecha(),
     datos: {
       actividad: f.actividad,
       minutos: leerEntero(f.minutosTexto),
@@ -175,7 +192,7 @@ function alGuardarDeporte(/** @type {SubmitEvent} */ evento) {
             kg: numeroOpcional(e.kg),
           }))
         : [],
-      nota: f.nota,
+      nota: original?.datos.nota ?? '', // ya no se pregunta; al editar, se conserva
     },
   };
 
@@ -220,8 +237,11 @@ function guardar(clase, registro) {
     if (estado.editandoId) {
       almacen.editar(estado.editandoId, registro);
       mostrarAviso('Cambios guardados.');
-      mostrarPestana('hoy');
+      ponerFecha(hoyLocal()); // terminada la edición, la fecha vuelve a hoy
+      mostrarPestana('registros');
     } else {
+      // La fecha queda como está: si estás cargando varias cosas de ayer, no hay que volver a
+      // elegirla cada vez. Al abrir la app vuelve a hoy.
       almacen.agregar({ clase, ...registro });
       mostrarAviso('Guardado.');
     }
@@ -233,7 +253,7 @@ function guardar(clase, registro) {
   return guardado;
 }
 
-/** Editar: carga el registro en su formulario y va a Anotar. */
+/** Editar: carga el registro en su formulario, con su fecha arriba, y va a Anotar. */
 function alEditar(/** @type {string} */ id) {
   const registro = leerRegistros().find((r) => r.id === id);
   if (!registro) return;
@@ -241,7 +261,6 @@ function alEditar(/** @type {string} */ id) {
 
   if (registro.clase === 'ejercicio') {
     estado.clase = 'deporte';
-    dibujarSelectorClase('deporte', alCambiarClase);
     dibujarFormularioDeporte(
       {
         actividad: datos.actividad,
@@ -254,8 +273,6 @@ function alEditar(/** @type {string} */ id) {
           repeticiones: String(e.repeticiones ?? ''),
           kg: aTexto(e.kg),
         })),
-        nota: datos.nota,
-        fecha: registro.fecha,
         nombres: nombresDeEjercicios(leerRegistros()),
         editando: true,
       },
@@ -263,42 +280,39 @@ function alEditar(/** @type {string} */ id) {
     );
   } else {
     estado.clase = 'plata';
-    dibujarSelectorClase('plata', alCambiarClase);
     dibujarFormulario({
       tipo: datos.tipo,
       categoria: datos.categoria,
       medio: datos.medio,
-      moneda: datos.moneda,
       monto: aTexto(datos.monto), // 3500.5 → "3500,5", como lo lee leerMonto
       detalle: datos.detalle,
-      fecha: registro.fecha,
-      proyecto: datos.proyecto,
       editando: true,
     });
   }
+  elegirClase(estado.clase);
+  ponerFecha(registro.fecha);
   // Se marca después de dibujar, porque dibujar un formulario nuevo deja editandoId en null.
   estado.editandoId = id;
   mostrarPestana('anotar');
 }
 
-/** Cancelar una edición: vuelve a Hoy con los formularios vacíos. */
+/** Cancelar una edición: vuelve a Registros con los formularios vacíos y la fecha de hoy. */
 function alCancelar() {
   formularioNuevo();
   formularioDeporteNuevo();
-  mostrarPestana('hoy');
+  ponerFecha(hoyLocal());
+  mostrarPestana('registros');
 }
 
-/** Borrar: pide confirmación; si ya se exportó, explica que queda anulado. */
+/** Borrar: pide confirmación y lo saca. */
 function alBorrar(/** @type {string} */ id) {
   const registro = leerRegistros().find((r) => r.id === id);
   if (!registro) return;
   const nombre =
-    registro.clase === 'ejercicio' ? resumenDeSesion(registro.datos, { corto: true }) : registro.datos.detalle;
-  const pregunta =
-    registro.exportado === null
-      ? `¿Borrar «${nombre}»?`
-      : `«${nombre}» ya se lo pasaste a Claude. Va a quedar anulado y se avisa en la próxima exportación. ¿Seguir?`;
-  if (!confirm(pregunta)) return;
+    registro.clase === 'ejercicio'
+      ? resumenDeSesion(registro.datos, { corto: true })
+      : registro.datos.detalle || registro.datos.categoria;
+  if (!confirm(`¿Borrar «${nombre}»?`)) return;
   try {
     almacen.borrar(id);
   } catch (error) {
@@ -307,43 +321,26 @@ function alBorrar(/** @type {string} */ id) {
   refrescar();
 }
 
-// ---------- Exportar ----------
+// ---------- Configuración ----------
 
-/** Copiar para Claude: copia el texto y, si se pudo copiar, marca todo como exportado. */
-async function alCopiar() {
-  const registros = leerRegistros();
-  const pend = pendientes(registros);
-  const texto = textoParaClaude(pend, momentoLocal(), registros);
-  try {
-    await navigator.clipboard.writeText(texto);
-  } catch {
-    // Si no se pudo copiar, no se marca nada: así no queda nada como exportado sin estarlo.
-    avisarError(new Error('No se pudo copiar. Abrí «Ver el texto» y copialo a mano.'));
-    return;
-  }
-  const ids = [...pend.nuevos, ...pend.corregidos, ...pend.anulados].map((r) => r.id);
-  try {
-    estado.copiaExportacion = almacen.marcarExportados(ids);
-    estado.ultimoTexto = texto;
-    mostrarAviso('Copiado. Pegáselo a Claude.', { accion: { texto: 'Deshacer', alTocar: alDeshacer } });
-  } catch (error) {
-    avisarError(error);
-  }
-  refrescar();
+/** El período de Copiar detalle: la semana (de lunes a domingo) o el día de la fecha elegida. */
+function periodoDetalle() {
+  const fecha = leerFechaDetalle() || hoyLocal();
+  if (estado.periodo === 'día') return { desde: fecha, hasta: fecha };
+  const lunes = lunesDe(fecha);
+  return { desde: lunes, hasta: sumarDias(lunes, 6) };
 }
 
-/** Deshacer: vuelve a dejar pendiente lo de la última exportación. */
-function alDeshacer() {
-  if (!estado.copiaExportacion) return;
+/** Copiar detalle: copia todo lo del período elegido. */
+async function alCopiar() {
+  const { desde, hasta } = periodoDetalle();
+  const texto = textoDeDetalle(leerRegistros(), desde, hasta, momentoLocal());
   try {
-    almacen.deshacerExportacion(estado.copiaExportacion);
-    estado.copiaExportacion = null;
-    estado.ultimoTexto = null;
-    mostrarAviso('Listo: vuelve a estar pendiente.');
-  } catch (error) {
-    avisarError(error);
+    await navigator.clipboard.writeText(texto);
+    mostrarAviso('Copiado. Pegáselo a Claude.');
+  } catch {
+    avisarError(new Error('No se pudo copiar. Abrí «Ver el texto» y copialo a mano.'));
   }
-  refrescar();
 }
 
 /** Descargar respaldo y anotar la fecha. */
@@ -374,42 +371,54 @@ async function alImportar(/** @type {Event} */ evento) {
 
 // ---------- Dibujar ----------
 
-/** Vuelve a dibujar Hoy y Exportar con los datos guardados. */
+const acciones = { alEditar, alBorrar };
+
+/** La línea corta de una sesión, para las listas. */
+const resumirSesion = (/** @type {import('./tipos.js').DatosEjercicio} */ datos) => resumenDeSesion(datos, { corto: true });
+
+/** Vuelve a dibujar Registros y Configuración con los datos guardados. */
 function refrescar() {
   const registros = leerRegistros();
-  const dia = /** @type {HTMLInputElement} */ (document.getElementById('dia')).value || hoyLocal();
-  const delDia = registrosDelDia(registros, dia);
-  const plataDelDia = delDia.filter((r) => r.clase === 'finanza');
+  const fecha = leerFechaRegistros() || hoyLocal();
+  const lunes = lunesDe(fecha);
+  const semana = resumenDeSemana(registros, lunes);
 
-  dibujarHoy({
-    registros: plataDelDia,
-    totales: totales(plataDelDia),
-    estadoDe: estadoDeExportacion,
-    alEditar,
-    alBorrar,
-  });
+  if (estado.vista === 'día') {
+    const delDia = registrosDelDia(registros, fecha);
+    const plata = delDia.filter((r) => r.clase === 'finanza');
+    dibujarRegistrosDia({
+      plata,
+      totales: totales(plata),
+      lunes,
+      semana,
+      sesiones: delDia.filter((r) => r.clase === 'ejercicio'),
+      resumirSesion,
+      acciones,
+    });
+  } else {
+    const deLaSemana = registrosDelPeriodo(registros, lunes, sumarDias(lunes, 6));
+    dibujarRegistrosSemana({ lunes, totales: totales(deLaSemana), semana, registros: deLaSemana, resumirSesion, acciones });
+  }
 
-  const lunes = lunesDe(dia);
-  dibujarDeporteHoy({
-    lunes,
-    semana: resumenDeSemana(registros, lunes),
-    sesiones: delDia.filter((r) => r.clase === 'ejercicio'),
-    resumirSesion: (datos) => resumenDeSesion(datos, { corto: true }),
-    estadoDe: estadoDeExportacion,
-    alEditar,
-    alBorrar,
-  });
-
-  const pend = pendientes(registros);
-  const cuantos = { nuevos: pend.nuevos.length, corregidos: pend.corregidos.length, anulados: pend.anulados.length };
-  const hayPendientes = cuantos.nuevos + cuantos.corregidos + cuantos.anulados > 0;
-  dibujarExportar({
-    cuantos,
-    // Si no hay nada pendiente, se muestra el último texto copiado (por si hay que volver a copiarlo).
-    texto: hayPendientes ? textoParaClaude(pend, momentoLocal(), registros) : (estado.ultimoTexto ?? textoParaClaude(pend, momentoLocal(), registros)),
-    puedeDeshacer: estado.copiaExportacion !== null,
+  const { desde, hasta } = periodoDetalle();
+  dibujarConfiguracion({
+    desde,
+    hasta,
+    texto: textoDeDetalle(registros, desde, hasta, momentoLocal()),
     ultimoRespaldo: almacen.leerUltimoRespaldo(),
   });
+}
+
+/** Día | Semana en Registros. */
+function alCambiarVista(/** @type {'día' | 'semana'} */ vista) {
+  estado.vista = vista;
+  refrescar();
+}
+
+/** Semana | Día en Copiar detalle. */
+function alCambiarPeriodo(/** @type {'semana' | 'día'} */ periodo) {
+  estado.periodo = periodo;
+  refrescar();
 }
 
 // ---------- Versión nueva (service worker) ----------
@@ -449,9 +458,13 @@ function registrarServiceWorker() {
 // ---------- Arranque ----------
 
 function iniciar() {
-  /** @type {HTMLInputElement} */ (document.getElementById('dia')).value = hoyLocal();
-  dibujarSelectorClase(estado.clase, alCambiarClase);
+  const hoy = hoyLocal();
+  ponerFecha(hoy);
+  dibujarVistaRegistros(estado.vista, hoy, alCambiarVista);
+  dibujarPeriodoDetalle(estado.periodo, hoy, alCambiarPeriodo);
+  conectarMenuClase(alCambiarClase);
   conectarFormularioDeporte();
+  elegirClase(estado.clase);
   formularioNuevo();
   formularioDeporteNuevo();
   refrescar();
@@ -463,22 +476,22 @@ function iniciar() {
   document.getElementById('boton-agregar-ejercicio')?.addEventListener('click', agregarEjercicio);
   document.getElementById('boton-repetir')?.addEventListener('click', alRepetir);
   document.getElementById('dia')?.addEventListener('change', refrescar);
+  document.getElementById('fecha-detalle')?.addEventListener('change', refrescar);
   document.getElementById('boton-copiar')?.addEventListener('click', alCopiar);
-  document.getElementById('boton-deshacer')?.addEventListener('click', alDeshacer);
   document.getElementById('boton-descargar')?.addEventListener('click', alDescargar);
   document.getElementById('archivo-respaldo')?.addEventListener('change', alImportar);
   for (const boton of document.querySelectorAll('[data-ir]')) {
     boton.addEventListener('click', () => {
-      mostrarPestana(/** @type {'anotar' | 'hoy' | 'exportar'} */ (/** @type {HTMLElement} */ (boton).dataset.ir));
+      mostrarPestana(/** @type {'anotar' | 'registros' | 'configuracion'} */ (/** @type {HTMLElement} */ (boton).dataset.ir));
       refrescar();
     });
   }
 
   // Recordar el respaldo semanal, si ya hay algo anotado.
-  if (leerRegistros().length > 0 && tocaRespaldo(almacen.leerUltimoRespaldo(), hoyLocal())) {
+  if (leerRegistros().length > 0 && tocaRespaldo(almacen.leerUltimoRespaldo(), hoy)) {
     mostrarAviso('Hace una semana o más que no descargás un respaldo.', {
       persistente: true,
-      accion: { texto: 'Ir', alTocar: () => mostrarPestana('exportar') },
+      accion: { texto: 'Ir', alTocar: () => mostrarPestana('configuracion') },
     });
   }
 

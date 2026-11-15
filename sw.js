@@ -3,7 +3,7 @@
 // AL PUBLICAR UN CAMBIO hay que subir el número de VERSION. Si no, el celular sigue usando la
 // copia vieja. Y si se agrega un archivo a la app, hay que sumarlo a ARCHIVOS.
 
-const VERSION = 'registrador-v2';
+const VERSION = 'registrador-v3';
 
 const ARCHIVOS = [
   './',

@@ -20,8 +20,21 @@
       <section id="pestana-anotar" class="pestana" data-pestana="anotar">
         <h1 id="titulo-formulario">Anotar</h1>
 
-        <!-- Plata | Deporte: elige cuál de los dos formularios se ve. Lo dibuja pantalla.js -->
-        <div class="opciones opciones-dos selector-clase" id="opciones-clase" role="radiogroup" aria-label="Qué anotar"></div>
+        <!-- Fecha y qué se anota: comunes a todos los formularios -->
+        <div class="fila-superior">
+          <div class="campo">
+            <label for="fecha-registro">Fecha</label>
+            <input id="fecha-registro" type="date" />
+          </div>
+          <div class="campo">
+            <label for="clase">Qué</label>
+            <select id="clase">
+              <option value="plata">Plata</option>
+              <option value="deporte">Deporte</option>
+            </select>
+          </div>
+        </div>
+        <p class="error" id="error-fecha"></p>
 
         <form id="formulario" novalidate autocomplete="off">
           <div class="campo">
@@ -45,34 +58,15 @@
 
           <div class="campo">
             <span class="etiqueta">Medio</span>
-            <div class="opciones" id="opciones-medio" role="radiogroup" aria-label="Medio"></div>
+            <div class="opciones opciones-dos" id="opciones-medio" role="radiogroup" aria-label="Medio"></div>
             <p class="error" data-error="medio"></p>
           </div>
 
           <div class="campo">
-            <label for="detalle">Detalle</label>
+            <label for="detalle">Detalle (opcional)</label>
             <input id="detalle" name="detalle" type="text" placeholder="súper, nafta, sueldo…" maxlength="120" />
             <p class="error" data-error="detalle"></p>
           </div>
-
-          <details id="mas-opciones">
-            <summary>Más opciones</summary>
-            <div class="campo">
-              <label for="fecha">Fecha</label>
-              <input id="fecha" name="fecha" type="date" />
-              <p class="error" data-error="fecha"></p>
-            </div>
-            <div class="campo">
-              <span class="etiqueta">Moneda</span>
-              <div class="opciones opciones-dos" id="opciones-moneda" role="radiogroup" aria-label="Moneda"></div>
-              <p class="error" data-error="moneda"></p>
-            </div>
-            <div class="campo">
-              <label for="proyecto">Proyecto (opcional)</label>
-              <input id="proyecto" name="proyecto" type="text" placeholder="P05" maxlength="3" autocapitalize="characters" />
-              <p class="error" data-error="proyecto"></p>
-            </div>
-          </details>
 
           <div class="acciones">
             <button type="submit" class="boton-principal" id="boton-guardar">Guardar</button>
@@ -117,20 +111,6 @@
             <p class="error" data-error="detalle"></p>
           </div>
 
-          <details id="mas-opciones-deporte">
-            <summary>Más opciones</summary>
-            <div class="campo">
-              <label for="fecha-deporte">Fecha</label>
-              <input id="fecha-deporte" type="date" />
-              <p class="error" data-error="fecha"></p>
-            </div>
-            <div class="campo">
-              <label for="nota">Nota (opcional)</label>
-              <input id="nota" type="text" placeholder="cómo me sentí, si dolió algo" maxlength="200" />
-              <p class="error" data-error="nota"></p>
-            </div>
-          </details>
-
           <div class="acciones">
             <button type="submit" class="boton-principal" id="boton-guardar-deporte">Guardar</button>
             <button type="button" class="boton-secundario" id="boton-cancelar-deporte" hidden>Cancelar</button>
@@ -138,36 +118,43 @@
         </form>
       </section>
 
-      <!-- ============ Hoy ============ -->
-      <section id="pestana-hoy" class="pestana" data-pestana="hoy" hidden>
+      <!-- ============ Registros ============ -->
+      <section id="pestana-registros" class="pestana" data-pestana="registros" hidden>
         <h1>Registros</h1>
-        <div class="campo">
-          <label for="dia">Día</label>
-          <input id="dia" type="date" />
+        <div class="fila-superior">
+          <div class="opciones opciones-dos" id="opciones-vista" role="radiogroup" aria-label="Ver"></div>
+          <input id="dia" type="date" aria-label="Fecha" />
         </div>
-        <h2>Plata</h2>
+
+        <h2 id="titulo-plata">Plata</h2>
         <div id="totales" class="totales"></div>
         <ul id="lista" class="lista"></ul>
 
         <h2 id="titulo-semana-deporte">Deporte</h2>
         <div id="semana-deporte" class="totales"></div>
         <ul id="lista-deporte" class="lista"></ul>
+
+        <!-- Vista de semana: todo junto, agrupado por día -->
+        <div id="lista-semana" hidden></div>
       </section>
 
-      <!-- ============ Exportar ============ -->
-      <section id="pestana-exportar" class="pestana" data-pestana="exportar" hidden>
-        <h1>Exportar</h1>
+      <!-- ============ Configuración ============ -->
+      <section id="pestana-configuracion" class="pestana" data-pestana="configuracion" hidden>
+        <h1>Configuración</h1>
 
         <div class="tarjeta">
-          <h2>Para Claude</h2>
-          <p id="resumen-pendientes"></p>
+          <h2>Copiar detalle</h2>
+          <div class="fila-superior">
+            <div class="opciones opciones-dos" id="opciones-periodo" role="radiogroup" aria-label="Período"></div>
+            <input id="fecha-detalle" type="date" aria-label="Fecha" />
+          </div>
+          <p id="periodo-detalle" class="ayuda"></p>
           <div class="acciones">
-            <button type="button" class="boton-principal" id="boton-copiar">Copiar para Claude</button>
-            <button type="button" class="boton-secundario" id="boton-deshacer" hidden>Deshacer</button>
+            <button type="button" class="boton-principal" id="boton-copiar">Copiar detalle</button>
           </div>
           <details>
             <summary>Ver el texto</summary>
-            <pre id="texto-claude"></pre>
+            <pre id="texto-detalle"></pre>
           </details>
         </div>
 
@@ -186,8 +173,8 @@
     <!-- ============ Pestañas, abajo para usarla con una mano ============ -->
     <nav class="pestanas" aria-label="Secciones">
       <button type="button" data-ir="anotar" aria-current="page">Anotar</button>
-      <button type="button" data-ir="hoy">Hoy</button>
-      <button type="button" data-ir="exportar">Exportar</button>
+      <button type="button" data-ir="registros">Registros</button>
+      <button type="button" data-ir="configuracion">Configuración</button>
     </nav>
   </body>
 </html>
