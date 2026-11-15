@@ -2,24 +2,35 @@
 
 import { momentoLocal } from './fechas.js';
 
-// El respaldo es un archivo JSON con todos los registros. Protege contra lo que localStorage
-// no protege: que se borren los datos del navegador, que se pierda o se cambie el celular.
+// El respaldo es un archivo JSON con todos los registros, los guardados y la tabla de alimentos.
+// Protege contra lo que localStorage no protege: que se borren los datos del navegador, que se
+// pierda o se cambie el celular.
+//
+// Versión 2 (14/11/2026): suma los guardados y la tabla de alimentos. Un respaldo de la versión 1
+// (sólo registros) se sigue pudiendo importar.
 //
 // Casi todo acá es puro (recibe datos, devuelve datos) y tiene pruebas. Lo único que necesita
 // el navegador es descargarRespaldo, que hace la descarga.
 
 const APP = 'registrador';
-const VERSION = 1;
+const VERSION = 2;
+
+/**
+ * @typedef {object} Extras lo que va en el respaldo además de los registros
+ * @property {import('./tipos.js').Guardado[]} [guardados]
+ * @property {import('./tipos.js').Alimento[]} [alimentos]
+ */
 
 /**
  * El contenido del archivo de respaldo.
  *
  * @param {import('./tipos.js').Registro[]} registros
  * @param {string} momento cuándo se hace, como lo da momentoLocal()
+ * @param {Extras} [extras]
  * @returns {string} el JSON, con sangría para que se pueda leer si se abre el archivo
  */
-export function armarRespaldo(registros, momento) {
-  return JSON.stringify({ app: APP, version: VERSION, fecha: momento, registros }, null, 2);
+export function armarRespaldo(registros, momento, { guardados = [], alimentos = [] } = {}) {
+  return JSON.stringify({ app: APP, version: VERSION, fecha: momento, registros, guardados, alimentos }, null, 2);
 }
 
 /**
@@ -31,11 +42,12 @@ export function nombreDelRespaldo(momento) {
 }
 
 /**
- * Lee el texto de un archivo de respaldo y devuelve sus registros. Si no es un respaldo del
- * registrador, o le falta algo, lanza un error y no se importa nada.
+ * Lee el texto de un archivo de respaldo y devuelve lo que trae. Si no es un respaldo del
+ * registrador, o le falta algo, lanza un error y no se importa nada. Un respaldo de la versión 1
+ * trae sólo registros: los guardados vienen vacíos y los alimentos, null (no trae tabla).
  *
  * @param {string} texto
- * @returns {import('./tipos.js').Registro[]}
+ * @returns {{registros: import('./tipos.js').Registro[], guardados: import('./tipos.js').Guardado[], alimentos: import('./tipos.js').Alimento[] | null}}
  */
 export function leerRespaldo(texto) {
   let respaldo;
@@ -63,7 +75,36 @@ export function leerRespaldo(texto) {
   if (incompleto) {
     throw new Error('El respaldo tiene registros incompletos. No se importó nada.');
   }
-  return respaldo.registros;
+
+  const guardados = respaldo.guardados ?? [];
+  const alimentos = respaldo.alimentos ?? null;
+  const guardadosMal =
+    !Array.isArray(guardados) ||
+    guardados.some(
+      (/** @type {any} */ g) =>
+        typeof g?.id !== 'string' || typeof g.nombre !== 'string' || typeof g.clase !== 'string' || typeof g.datos !== 'object',
+    );
+  const alimentosMal =
+    alimentos !== null &&
+    (!Array.isArray(alimentos) || alimentos.some((/** @type {any} */ a) => typeof a?.alimento !== 'string'));
+  if (guardadosMal || alimentosMal) {
+    throw new Error('El respaldo tiene guardados o alimentos incompletos. No se importó nada.');
+  }
+  return { registros: respaldo.registros, guardados, alimentos };
+}
+
+/**
+ * Une los guardados actuales con los de un respaldo, por id: agrega los que faltan y deja los
+ * que ya están como están. No cambia las listas que recibe.
+ *
+ * @param {import('./tipos.js').Guardado[]} actuales
+ * @param {import('./tipos.js').Guardado[]} delRespaldo
+ * @returns {{guardados: import('./tipos.js').Guardado[], agregados: number}}
+ */
+export function unirGuardados(actuales, delRespaldo) {
+  const ids = new Set(actuales.map((g) => g.id));
+  const nuevos = delRespaldo.filter((g) => !ids.has(g.id));
+  return { guardados: [...actuales, ...nuevos], agregados: nuevos.length };
 }
 
 /**
@@ -101,20 +142,26 @@ export function unirRegistros(actuales, delRespaldo) {
 }
 
 /**
- * Lee un archivo de respaldo elegido por el usuario, lo une con lo guardado y guarda.
+ * Lee un archivo de respaldo elegido por el usuario, lo une con lo guardado y guarda:
+ * - los registros, con unirRegistros;
+ * - los guardados, con unirGuardados;
+ * - la tabla de alimentos, sólo si ahora no hay ninguna (la que está cargada es la más nueva).
  *
  * @param {Blob} archivo el archivo elegido (File es un tipo de Blob)
  * @param {ReturnType<typeof import('./almacen.js').crearAlmacen>} almacen
- * @returns {Promise<{agregados: number, actualizados: number, sin_cambios: number}>}
+ * @returns {Promise<{agregados: number, actualizados: number, sin_cambios: number, guardados: number, tabla: boolean}>}
  */
 export async function importarRespaldo(archivo, almacen) {
-  const delRespaldo = leerRespaldo(await archivo.text());
-  const { registros, agregados, actualizados, sin_cambios } = unirRegistros(
-    almacen.leerTodos(),
-    delRespaldo,
-  );
+  const respaldo = leerRespaldo(await archivo.text());
+  const { registros, agregados, actualizados, sin_cambios } = unirRegistros(almacen.leerTodos(), respaldo.registros);
+  const unidos = unirGuardados(almacen.leerGuardados(), respaldo.guardados);
+  const alimentos = respaldo.alimentos ?? [];
+  const tabla = alimentos.length > 0 && almacen.leerAlimentos().length === 0;
+
   almacen.guardarTodos(registros);
-  return { agregados, actualizados, sin_cambios };
+  almacen.guardarGuardados(unidos.guardados);
+  if (tabla) almacen.guardarAlimentos(alimentos);
+  return { agregados, actualizados, sin_cambios, guardados: unidos.agregados, tabla };
 }
 
 /**
@@ -141,10 +188,11 @@ export function tocaRespaldo(ultimo, hoy) {
  * la dirección temporal.
  *
  * @param {import('./tipos.js').Registro[]} registros
+ * @param {Extras} [extras] los guardados y la tabla de alimentos
  * @param {string} [momento] por defecto, ahora
  */
-export function descargarRespaldo(registros, momento = momentoLocal()) {
-  const blob = new Blob([armarRespaldo(registros, momento)], { type: 'application/json' });
+export function descargarRespaldo(registros, extras = {}, momento = momentoLocal()) {
+  const blob = new Blob([armarRespaldo(registros, momento, extras)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement('a');
   enlace.href = url;

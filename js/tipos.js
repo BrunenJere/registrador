@@ -58,6 +58,29 @@
  */
 
 /**
+ * Una sesión de deporte o una comida con nombre, para completar el formulario (§15, pasos 3 y 4).
+ * No tiene fecha: no es algo que pasó.
+ *
+ * @typedef {object} Guardado
+ * @property {string} id
+ * @property {string} clase   "ejercicio" o "comida"
+ * @property {string} nombre  por ejemplo "Run easy"
+ * @property {any} datos      los datos de la sesión o de la comida
+ */
+
+/**
+ * Un alimento de la tabla cargada desde el CSV, con sus valores por porción (§15, paso 5).
+ *
+ * @typedef {object} Alimento
+ * @property {string} alimento
+ * @property {string} porcion       lo que es una porción, por ejemplo "100 g" o "1 unidad"
+ * @property {number} kcal
+ * @property {number} proteinas     en gramos
+ * @property {number} carbohidratos en gramos
+ * @property {number} grasas        en gramos
+ */
+
+/**
  * Un error de validación, con el campo al que corresponde para mostrarlo al lado.
  *
  * @typedef {object} ErrorDeValidacion

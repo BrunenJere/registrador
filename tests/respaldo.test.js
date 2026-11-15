@@ -38,14 +38,22 @@ function storageFalso() {
   };
 }
 
+const GUARDADO = { id: 'g1', clase: 'ejercicio', nombre: 'Run easy', datos: { actividad: 'correr', km: 3, minutos: 30 } };
+const ALIMENTO = { alimento: 'Banana', porcion: '1 unidad', kcal: 105, proteinas: 1.3, carbohidratos: 27, grasas: 0.4 };
+
 test('armarRespaldo y leerRespaldo van y vuelven sin perder nada', () => {
   const registros = [registro('a'), registro('b')];
-  const texto = armarRespaldo(registros, MOMENTO);
+  const texto = armarRespaldo(registros, MOMENTO, { guardados: [GUARDADO], alimentos: [ALIMENTO] });
   const contenido = JSON.parse(texto);
   assert.equal(contenido.app, 'registrador');
-  assert.equal(contenido.version, 1);
+  assert.equal(contenido.version, 2);
   assert.equal(contenido.fecha, MOMENTO);
-  assert.deepEqual(leerRespaldo(texto), registros);
+  assert.deepEqual(leerRespaldo(texto), { registros, guardados: [GUARDADO], alimentos: [ALIMENTO] });
+});
+
+test('un respaldo de la versión 1 se sigue leyendo: sin guardados y sin tabla', () => {
+  const texto = JSON.stringify({ app: 'registrador', version: 1, fecha: MOMENTO, registros: [registro('a')] });
+  assert.deepEqual(leerRespaldo(texto), { registros: [registro('a')], guardados: [], alimentos: null });
 });
 
 test('nombreDelRespaldo lleva la fecha', () => {
@@ -59,11 +67,35 @@ test('leerRespaldo rechaza lo que no es un respaldo del registrador', () => {
 });
 
 test('leerRespaldo rechaza versiones más nuevas y registros incompletos', () => {
-  assert.throws(() => leerRespaldo('{"app":"registrador","version":2,"registros":[]}'), /versión más nueva/);
+  assert.throws(() => leerRespaldo('{"app":"registrador","version":3,"registros":[]}'), /versión más nueva/);
   assert.throws(
     () => leerRespaldo('{"app":"registrador","version":1,"registros":[{"id":"a"}]}'),
     /incompletos/,
   );
+  assert.throws(
+    () => leerRespaldo('{"app":"registrador","version":2,"registros":[],"guardados":[{"id":"g"}]}'),
+    /guardados o alimentos incompletos/,
+  );
+});
+
+test('importar une los guardados por id y carga la tabla sólo si no hay una', async () => {
+  const storage = storageFalso();
+  const almacen = crearAlmacen(storage);
+  const otroGuardado = { ...GUARDADO, id: 'g2', nombre: 'Fuerza A' };
+  almacen.guardarGuardados([GUARDADO]);
+  const archivo = new Blob([armarRespaldo([], MOMENTO, { guardados: [GUARDADO, otroGuardado], alimentos: [ALIMENTO] })]);
+
+  const r = await importarRespaldo(archivo, almacen);
+  assert.equal(r.guardados, 1); // g1 ya estaba
+  assert.equal(r.tabla, true);
+  assert.deepEqual(almacen.leerGuardados().map((g) => g.id), ['g1', 'g2']);
+  assert.deepEqual(almacen.leerAlimentos(), [ALIMENTO]);
+
+  // Con una tabla ya cargada, el respaldo no la pisa.
+  almacen.guardarAlimentos([{ ...ALIMENTO, alimento: 'Manzana' }]);
+  const otra = await importarRespaldo(archivo, almacen);
+  assert.equal(otra.tabla, false);
+  assert.equal(almacen.leerAlimentos()[0].alimento, 'Manzana');
 });
 
 test('unirRegistros agrega lo que falta y se queda con lo editado más recientemente', () => {
@@ -104,8 +136,8 @@ test('importar el mismo respaldo dos veces no duplica nada', async () => {
   const almacen = crearAlmacen(storage);
   const archivo = new Blob([armarRespaldo([registro('a'), registro('b')], MOMENTO)]);
 
-  assert.deepEqual(await importarRespaldo(archivo, almacen), { agregados: 2, actualizados: 0, sin_cambios: 0 });
-  assert.deepEqual(await importarRespaldo(archivo, almacen), { agregados: 0, actualizados: 0, sin_cambios: 2 });
+  assert.deepEqual(await importarRespaldo(archivo, almacen), { agregados: 2, actualizados: 0, sin_cambios: 0, guardados: 0, tabla: false });
+  assert.deepEqual(await importarRespaldo(archivo, almacen), { agregados: 0, actualizados: 0, sin_cambios: 2, guardados: 0, tabla: false });
   assert.equal(almacen.leerTodos().length, 2);
 });
 

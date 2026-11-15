@@ -1,6 +1,7 @@
 // @ts-check
 
 import { momentoLocal } from './fechas.js';
+import { normalizar } from './textos.js';
 
 // Lo único que toca localStorage.
 //
@@ -11,6 +12,11 @@ export const CLAVE = 'registrador:v1:registros';
 
 // Cuándo se descargó el último respaldo, para recordar hacerlo una vez por semana.
 export const CLAVE_ULTIMO_RESPALDO = 'registrador:v1:ultimo-respaldo';
+
+// Los guardados (sesiones de deporte y comidas con nombre, para completar el formulario) y la
+// tabla de alimentos cargada desde un CSV. Van aparte de los registros: no son algo que pasó.
+export const CLAVE_GUARDADOS = 'registrador:v1:guardados';
+export const CLAVE_ALIMENTOS = 'registrador:v1:alimentos';
 
 // Todas las operaciones siguen el mismo patrón: leer la lista entera, cambiarla y guardarla
 // entera. Con unos cientos de registros por mes es instantáneo, y es el patrón más simple de
@@ -33,40 +39,42 @@ export const CLAVE_ULTIMO_RESPALDO = 'registrador:v1:ultimo-respaldo';
  */
 export function crearAlmacen(storage = globalThis.localStorage) {
   /**
-   * Todos los registros guardados.
+   * Lee una lista guardada como JSON. Si no hay nada, devuelve []. Si el texto está roto, lanza
+   * un error y no pisa nada: los datos quedan como están para poder recuperarlos.
    *
-   * @returns {import('./tipos.js').Registro[]}
+   * @param {string} clave
+   * @returns {any[]}
    */
-  function leerTodos() {
-    const texto = storage.getItem(CLAVE);
+  function leerLista(clave) {
+    const texto = storage.getItem(clave);
     if (texto === null) {
       return []; // la primera vez todavía no hay nada guardado
     }
 
-    let registros;
+    let lista;
     try {
-      registros = JSON.parse(texto);
+      lista = JSON.parse(texto);
     } catch {
-      registros = null;
+      lista = null;
     }
-    if (!Array.isArray(registros)) {
-      // No se pisa nada: los datos quedan como están para poder recuperarlos.
+    if (!Array.isArray(lista)) {
       throw new Error(
         'Los datos guardados están dañados y no se pueden leer. No se cambió nada: ' +
           'importá el último respaldo o avisale a Claude antes de seguir anotando.',
       );
     }
-    return registros;
+    return lista;
   }
 
   /**
-   * Guarda la lista entera.
+   * Guarda una lista entera como JSON. Si no hay espacio, avisa en vez de fallar en silencio.
    *
-   * @param {import('./tipos.js').Registro[]} registros
+   * @param {string} clave
+   * @param {any[]} lista
    */
-  function guardarTodos(registros) {
+  function guardarLista(clave, lista) {
     try {
-      storage.setItem(CLAVE, JSON.stringify(registros));
+      storage.setItem(clave, JSON.stringify(lista));
     } catch (error) {
       if (error instanceof DOMException && error.name === 'QuotaExceededError') {
         throw new Error(
@@ -75,6 +83,24 @@ export function crearAlmacen(storage = globalThis.localStorage) {
       }
       throw error; // cualquier otro problema se informa tal cual
     }
+  }
+
+  /**
+   * Todos los registros guardados.
+   *
+   * @returns {import('./tipos.js').Registro[]}
+   */
+  function leerTodos() {
+    return leerLista(CLAVE);
+  }
+
+  /**
+   * Guarda la lista entera de registros.
+   *
+   * @param {import('./tipos.js').Registro[]} registros
+   */
+  function guardarTodos(registros) {
+    guardarLista(CLAVE, registros);
   }
 
   /**
@@ -162,6 +188,79 @@ export function crearAlmacen(storage = globalThis.localStorage) {
     storage.setItem(CLAVE_ULTIMO_RESPALDO, momento);
   }
 
+  // ---------- Guardados ----------
+
+  /**
+   * Todos los guardados (de deporte y de comidas).
+   *
+   * @returns {import('./tipos.js').Guardado[]}
+   */
+  function leerGuardados() {
+    return leerLista(CLAVE_GUARDADOS);
+  }
+
+  /**
+   * Guarda la lista entera de guardados (la usa el respaldo).
+   *
+   * @param {import('./tipos.js').Guardado[]} guardados
+   */
+  function guardarGuardados(guardados) {
+    guardarLista(CLAVE_GUARDADOS, guardados);
+  }
+
+  /**
+   * Agrega un guardado. Si ya hay uno de la misma clase con el mismo nombre (sin importar
+   * mayúsculas ni tildes), lo reemplaza: app.js pregunta antes.
+   *
+   * @param {{clase: string, nombre: string, datos: object}} entrada
+   * @returns {import('./tipos.js').Guardado}
+   */
+  function agregarGuardado(entrada) {
+    const guardados = leerGuardados();
+    const nombre = entrada.nombre.trim();
+    const existente = guardados.find((g) => g.clase === entrada.clase && normalizar(g.nombre) === normalizar(nombre));
+    if (existente) {
+      existente.nombre = nombre;
+      existente.datos = structuredClone(entrada.datos);
+      guardarGuardados(guardados);
+      return existente;
+    }
+    /** @type {import('./tipos.js').Guardado} */
+    const guardado = { id: crypto.randomUUID(), clase: entrada.clase, nombre, datos: structuredClone(entrada.datos) };
+    guardados.push(guardado);
+    guardarGuardados(guardados);
+    return guardado;
+  }
+
+  /**
+   * Borra un guardado. Los registros que se anotaron a partir de él no cambian.
+   *
+   * @param {string} id
+   */
+  function borrarGuardado(id) {
+    guardarGuardados(leerGuardados().filter((g) => g.id !== id));
+  }
+
+  // ---------- Tabla de alimentos ----------
+
+  /**
+   * La tabla de alimentos cargada desde el CSV ([] si no hay).
+   *
+   * @returns {import('./tipos.js').Alimento[]}
+   */
+  function leerAlimentos() {
+    return leerLista(CLAVE_ALIMENTOS);
+  }
+
+  /**
+   * Reemplaza la tabla de alimentos entera ([] la borra).
+   *
+   * @param {import('./tipos.js').Alimento[]} alimentos
+   */
+  function guardarAlimentos(alimentos) {
+    guardarLista(CLAVE_ALIMENTOS, alimentos);
+  }
+
   return {
     leerTodos,
     guardarTodos,
@@ -170,6 +269,12 @@ export function crearAlmacen(storage = globalThis.localStorage) {
     borrar,
     leerUltimoRespaldo,
     guardarUltimoRespaldo,
+    leerGuardados,
+    guardarGuardados,
+    agregarGuardado,
+    borrarGuardado,
+    leerAlimentos,
+    guardarAlimentos,
   };
 }
 
